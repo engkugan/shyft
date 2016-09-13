@@ -211,7 +211,7 @@ class DefaultSimulator(object):
         self.region_model.get_states(state)
         return state
 
-    def discharge_adjusted_state(self, obs_discharge, state=None):
+    def discharge_adjusted_state(self, obs_discharge, c_idx=None, state=None):
         """
         Parameters
         ----------
@@ -222,15 +222,21 @@ class DefaultSimulator(object):
         """
         if state is None:
             state = self.reg_model_state
-        reg_mod = self.region_model
-        areas = np.array([cell.geo.area() for cell in reg_mod.get_cells()])
+        #reg_mod = self.region_model
+        cells = self.region_model.cells
+        if c_idx is None:
+            c_idx = range(len(cells))
+        #areas = np.array([cell.geo.area() for cell in reg_mod.get_cells()])
+        areas = np.array([cells[j].geo.area() for j in c_idx])
         area_tot = areas.sum()
         avg_obs_discharge = obs_discharge*3600.*1000./area_tot  # Convert to l/h per m2
-        state_discharge = np.array([state[i].kirchner.q for i in range(state.size())])
+        #state_discharge = np.array([state[i].kirchner.q for i in range(state.size())])
+        state_discharge = np.array([state[i].kirchner.q for i in c_idx])
         avg_state_discharge = (state_discharge*areas).sum()/area_tot
         discharge_ratios = state_discharge/avg_state_discharge
         updated_state_discharge = avg_obs_discharge*discharge_ratios
-        for i in range(state.size()):
+        #for i in range(state.size()):
+        for i in c_idx:
             if not math.isnan(updated_state_discharge[i]):
                 state[i].kirchner.q = updated_state_discharge[i]
             else:

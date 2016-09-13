@@ -1,4 +1,5 @@
 import numpy as np
+from collections import Counter
 import yaml
 import os
 
@@ -20,6 +21,8 @@ class ConfigSimulator(simulator.DefaultSimulator):
             super().__init__(arg.region_model_id,arg.interpolation_id,arg.region_model,
                              arg.geo_ts, arg.interp_repos)
             self.config = arg
+
+        self.update_state_methods = {'discharge':self._update_discharge_state}
 
         self.time_axis = self.config.time_axis
         self.state = self.get_initial_state()
@@ -62,8 +65,43 @@ class ConfigSimulator(simulator.DefaultSimulator):
         self.config.end_state_repo.put_state(self.config.region_model_id, self.region_model.time_axis.total_period().end,
                                              endstate, tags=None)
 
-    def update_state(self, var='discharge', catch_id=None):
-        pass
+    def _update_discharge_state(self, state):
+        if state is None:
+            state = self.reg_model_state
+        cid_map = self.region_model.catchment_id_map
+        cells = self.region_model.cells
+        cidx_full = [cell.geo.catchment_id() for cell in cells]
+        cids = []
+        for ts_info in self.config.ref_repo:
+            cid = ts_info['catch_id']
+            mapped_indx = [cid_map.index(ID) for ID in cid if ID in cid_map]
+            if len(mapped_indx) != len(cid):
+                raise ConfigSimulatorError(
+                    "Catchment index {} for reference series {} not found.".format(
+                        ','.join([str(val) for val in [i for i in cid if i not in cid_map]]), ts_info['uid']))
+            cids.extend(cid)
+            non_unique = [item for item, count in Counter(cids).iteritems() if count > 1]
+            if len(non_unique) > 0:
+                raise ConfigSimulatorError(
+                    "Overlapping catchments: Catchment index {} for reference series {} are duplicates.".format(
+                        ','.join([str(val) for val in non_unique]), ts_info['uid']))
+            ts_info['obs_value'] = self.get_obs_inflow(ts_info['repo'],self.time_axis.total_period().start,
+                                                       ts_info['uid'])
+            cidx_part = np.in1d(cidx_full, mapped_indx).nonzero()[0]
+            self.discharge_adjusted_state(ts_info['obs_value'], c_idx=cidx_part, state=state)
+        return state
+
+    def get_obs_inflow(self, ts_repo, t_target, ts_uid, dt=3600, n_steps=24):
+        # print cal.toString(t_target)
+        t_start = t_target - n_steps * dt
+        t_end = t_target + (n_steps + 1) * dt
+        period = api.UtcPeriod(t_start, t_end)
+        data = ts_repo.read([ts_uid], period)[ts_uid]
+        # print cal.toString(data.time(data.index_of(t_target)))
+        return data.value(data.index_of(t_target))
+
+    def update_state(self, var_type='discharge', state=None):
+        return self.update_state_methods[var_type](state)
 
     def run(self, time_axis=None, state=None):
         if time_axis is not None:
