@@ -67,6 +67,12 @@ namespace shyft {
 			double forest_;
         };
 
+        /** The routing_info contains the geo-static parts of the relation between
+         * the cell and the routing sink point */
+        struct routing_info {
+            int id=0; ///< target routing input identifier (similar to catchment_id), 0 means nil,none
+            double distance=0.0; ///< static routing distance to the routing point
+        };
 
         const double default_radiation_slope_factor=0.9;
 
@@ -96,6 +102,7 @@ namespace shyft {
 			void set_land_type_fractions(const land_type_fractions& ltf) { fractions = ltf; }
 			double area() const { return area_m2; }
 			size_t catchment_ix; // internally generated zero-based catchment index, used to correlate to calc-filter, ref. region_model
+            routing_info routing;///< keeps the geo-static routing info, where it routes to, and routing distance.
 		  private:
 
 			geo_point mid_point_; // midpoint
