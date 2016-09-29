@@ -360,6 +360,27 @@ namespace shyft {
 		}
 	};
 
+	template <typename cell>
+	struct hbv_soil_cell_state_statistics {
+		shared_ptr<vector<cell>> cells;
+		hbv_soil_cell_state_statistics(shared_ptr<vector<cell>> cells) :cells(cells) {}
+
+		apoint_ts discharge(const vector<int>& catchment_indexes) const {
+			return apoint_ts(*shyft::core::cell_statistics::
+				sum_catchment_feature(*cells, catchment_indexes,
+					[](const cell& c) { return c.sc.soil_sm; }));
+		}
+		vector<double> discharge(const vector<int>& catchment_indexes, size_t ith_timestep) const {
+			return shyft::core::cell_statistics::
+				catchment_feature(*cells, catchment_indexes,
+					[](const cell& c) { return c.sc.soil_sm; }, ith_timestep);
+		}
+		double discharge_value(const vector<int>& catchment_indexes, size_t ith_timestep) const {
+			return shyft::core::cell_statistics::
+				sum_catchment_feature_value(*cells, catchment_indexes,
+					[](const cell& c) { return c.sc.soil_sm; }, ith_timestep);
+		}
+	};
     ///< cells with gamma_snow state collection gives access to time-series for state
     template <typename cell>
     struct gamma_snow_cell_state_statistics {
@@ -776,6 +797,27 @@ namespace shyft {
 		}
 	};
 
+	template <typename cell>
+	struct hbv_soil_cell_response_statistics {
+		shared_ptr<vector<cell>> cells;
+		hbv_soil_cell_response_statistics(shared_ptr<vector<cell>> cells) :cells(cells) {}
+
+		apoint_ts output(const vector<int>& catchment_indexes) const {
+			return apoint_ts(*shyft::core::cell_statistics::
+				average_catchment_feature(*cells, catchment_indexes,
+					[](const cell& c) { return c.rc.soil_outflow; }));
+		}
+		vector<double> output(const vector<int>& catchment_indexes, size_t ith_timestep) const {
+			return shyft::core::cell_statistics::
+				catchment_feature(*cells, catchment_indexes,
+					[](const cell& c) { return c.rc.soil_outflow; }, ith_timestep);
+		}
+		double output_value(const vector<int>& catchment_indexes, size_t ith_timestep) const {
+			return shyft::core::cell_statistics::
+				average_catchment_feature_value(*cells, catchment_indexes,
+					[](const cell& c) { return c.rc.soil_outflow; }, ith_timestep);
+		}
+	};
     template <typename cell>
     struct actual_evapotranspiration_cell_response_statistics {
         shared_ptr<vector<cell>> cells;

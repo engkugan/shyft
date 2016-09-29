@@ -5,7 +5,7 @@
 #include "gamma_snow.h"
 #include "actual_evapotranspiration.h"
 #include "precipitation_correction.h"
-
+#include "hbv_soil.h"
 
 namespace shyft {
   namespace core {
@@ -29,6 +29,7 @@ namespace shyft {
             typedef actual_evapotranspiration::parameter ae_parameter_t;
             typedef kirchner::parameter kirchner_parameter_t;
             typedef precipitation_correction::parameter precipitation_correction_parameter_t;
+			typedef hbv_soil::parameter hbv_soil_parameter_t;
 
             parameter(pt_parameter_t pt,
                       gs_parameter_t gs,
@@ -36,18 +37,29 @@ namespace shyft {
                       kirchner_parameter_t k,
                       precipitation_correction_parameter_t p_corr)
              : pt(pt), gs(gs), ae(ae), kirchner(k), p_corr(p_corr) { /*Do nothing */ }
+			parameter(pt_parameter_t pt,
+				gs_parameter_t gs,
+				ae_parameter_t ae,
+				kirchner_parameter_t k,
+				precipitation_correction_parameter_t p_corr,
+				hbv_soil_parameter_t soil)
+				: pt(pt), gs(gs), ae(ae), kirchner(k), p_corr(p_corr),soil(soil) { /*Do nothing */
+			}
+
             parameter() {}
             parameter(const parameter& other)
              : pt(other.pt), gs(other.gs), ae(other.ae),
-               kirchner(other.kirchner), p_corr(other.p_corr) { /*Do nothing */ }
+               kirchner(other.kirchner), p_corr(other.p_corr),soil(other.soil) { /*Do nothing */ }
 
             pt_parameter_t pt;
             gs_parameter_t gs;
             ae_parameter_t ae;
             kirchner_parameter_t  kirchner;
             precipitation_correction_parameter_t p_corr;
+			hbv_soil_parameter_t soil;
+
             ///<calibration support, needs vector interface to params, size is the total count
-            size_t size() const { return 21; }
+            size_t size() const { return 21+3; }
             ///<calibration support, need to set values from ordered vector
             void set(const vector<double>& p) {
                 if (p.size() != size())
@@ -74,6 +86,9 @@ namespace shyft {
                 gs.snow_cv_altitude_factor=p[i++];
 				pt.albedo = p[i++];
 				pt.alpha = p[i++];
+				soil.fc = p[i++];
+				soil.beta = p[i++];
+				soil.lp = p[i++];
             }
 
             ///< calibration support, get the value of i'th parameter
@@ -100,6 +115,9 @@ namespace shyft {
                     case 18:return gs.snow_cv_altitude_factor;
 					case 19:return pt.albedo;
 					case 20:return pt.alpha;
+					case 21: return soil.fc;
+					case 22: return soil.beta;
+					case 23: return soil.lp;
                 default:
                     throw runtime_error("PTGSK Parameter Accessor:.get(i) Out of range.");
                 }
@@ -129,7 +147,10 @@ namespace shyft {
                     "gs.snow_cv_forest_factor",
                     "gs.snow_cv_altitude_factor",
                     "pt.albedo",
-                    "pt.alpha"
+                    "pt.alpha",
+					"soil.fc",
+					"soil.beta",
+					"soil.lp"
                 };
                 if (i >= size())
                     throw runtime_error("PTGSK Parameter Accessor:.get_name(i) Out of range.");
@@ -148,11 +169,14 @@ namespace shyft {
         struct state {
             typedef gamma_snow::state gs_state_t;
             typedef kirchner::state kirchner_state_t;
-            state() {}
+			typedef hbv_soil::state hbv_soil_state_t;
+			state() {}
             state(gs_state_t gs, kirchner_state_t k) : gs(gs), kirchner(k) {}
-            gs_state_t gs;
+			state(gs_state_t gs, kirchner_state_t k,hbv_soil_state_t s) : gs(gs), kirchner(k),soil(s) {}
+			gs_state_t gs;
             kirchner_state_t kirchner;
-            bool operator==(const state& x) const {return gs==x.gs && kirchner==x.kirchner;}
+			hbv_soil_state_t soil;
+            bool operator==(const state& x) const {return gs==x.gs && kirchner==x.kirchner && soil==x.soil;}
         };
 
 
@@ -166,16 +190,19 @@ namespace shyft {
             typedef gamma_snow::response gs_response_t;
             typedef actual_evapotranspiration::response  ae_response_t;
             typedef kirchner::response kirchner_response_t;
+			typedef hbv_soil::response hbv_soil_response_t;
             pt_response_t pt;
             gs_response_t gs;
             ae_response_t ae;
             kirchner_response_t kirchner;
+			hbv_soil_response_t soil;
+
 
             // Stack response
             double total_discharge;
         };
 
-        /** \brief Calculation Model using assembly of PriestleyTaylor, GammaSnow and Kirchner
+        /** \brief Calculation Model using assembly of PriestleyTaylor, GammaSnow, Soil and Kirchner
          *
          * This model first uses PriestleyTaylor for calculating the potential
          * evapotranspiration based on time series data for temperature,
@@ -230,7 +257,7 @@ namespace shyft {
          * \tparam RC Response collector type that implements:
          *    - RC.collect(utctime t, const R& response) --> Possibly save some responses at time t.
          */
-#ifndef SWIG
+
         template<template <typename, typename> class A, class R, class T_TS, class P_TS, class WS_TS, class RH_TS, class RAD_TS, class T,
         class S, class GCD, class P, class SC, class RC>
         void run_pt_gs_k(const GCD& geo_cell_data,
@@ -262,7 +289,10 @@ namespace shyft {
             precipitation_correction::calculator p_corr(parameter.p_corr.scale_factor);
             priestley_taylor::calculator pt(parameter.pt.albedo, parameter.pt.alpha);
             gamma_snow::calculator<typename P::gs_parameter_t, typename S::gs_state_t, typename R::gs_response_t> gs;
-            kirchner::calculator<kirchner::trapezoidal_average, typename P::kirchner_parameter_t> kirchner(parameter.kirchner);
+            // -- 
+			// hbv_soil::calculater<typename P::hbv_soil_paramer_t, typename S::hbv_soil_state, ...> hbv_soil(parameter.hbv_soil);
+			hbv_soil::calculator<typename P::hbv_soil_parameter_t> soil(parameter.soil);
+			kirchner::calculator<kirchner::trapezoidal_average, typename P::kirchner_parameter_t> kirchner(parameter.kirchner);
             //
             gs.set_glacier_fraction(geo_cell_data.land_type_fractions_info().glacier());
             // Get the initial states
@@ -298,10 +328,13 @@ namespace shyft {
                 double act_evap = actual_evapotranspiration::calculate_step(q, pot_evap,
                                   parameter.ae.ae_scale_factor, response.gs.sca, period.timespan());
                 response.ae.ae = act_evap;
-
+				// soil layer goes here:
+				// if( geo_cell_data.something), decide action.
+				soil.step(state.soil, response.soil, period.start, period.end, response.gs.outflow, pot_evap, act_evap);
+				// q_soil=hbv_soil.step(state.hbv_soil, response.gs.outflow);
                 // Use responses from PriestleyTaylor and GammaSnow in Kirchner
-                double q_avg;
-                kirchner.step(period.start, period.end, q, q_avg, response.gs.outflow, act_evap);
+                double q_avg;                                    // q_soil
+                kirchner.step(period.start, period.end, q, q_avg, response.soil.outflow, 0.0, geo_cell_data.urban_area);
                 state.kirchner.q = q; // Save discharge state variable
                 response.kirchner.q_avg = q_avg;
 
@@ -321,7 +354,6 @@ namespace shyft {
             }
             response_collector.set_end_response(response);
         }
-#endif
     } // pt_gs_k
   } // core
 } // shyft

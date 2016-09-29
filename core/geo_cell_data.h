@@ -96,6 +96,7 @@ namespace shyft {
 			void set_land_type_fractions(const land_type_fractions& ltf) { fractions = ltf; }
 			double area() const { return area_m2; }
 			size_t catchment_ix; // internally generated zero-based catchment index, used to correlate to calc-filter, ref. region_model
+			bool urban_area=false; // this cell behaves according to urban-area at run-off 
 		  private:
 
 			geo_point mid_point_; // midpoint

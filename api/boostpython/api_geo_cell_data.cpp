@@ -41,6 +41,7 @@ namespace expose {
         .def("land_type_fractions_info",&geo_cell_data::land_type_fractions_info,"land_type_fractions",return_value_policy<copy_const_reference>())
         .def("set_land_type_fractions",&geo_cell_data::set_land_type_fractions,args("ltf"),"set new LandTypeFractions")
         .def("area",&geo_cell_data::area,"returns the area in m^2")
+		.def_readwrite("urban_area", &geo_cell_data::urban_area,"default = false, if true, doing some more urban type response")
         ;
     }
 }

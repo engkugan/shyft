@@ -108,6 +108,9 @@
     <ClInclude Include="kalman.h">
       <Filter>interpolation</Filter>
     </ClInclude>
+    <ClInclude Include="hbv_soil.h">
+      <Filter>methods</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="methods">

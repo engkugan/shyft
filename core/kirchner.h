@@ -209,7 +209,11 @@ namespace shyft {
                  * \note If the supplied q (state) is less than min_q(0.00001, it represents mm water..),
                  *       it is forced to min_q to ensure numerical stability
                  */
-                void step(shyft::timeseries::utctime T0, shyft::timeseries::utctime T1, double& q, double& q_avg, double p, double e) {
+                void step(shyft::timeseries::utctime T0, shyft::timeseries::utctime T1, double& q, double& q_avg, double p, double e, bool urban_area=false) {
+					if (urban_area) {
+						q_avg=  p - e; // p, e, are in mm/h, response should be mm/h
+						return;
+					}
                     state_type x_tmp;
                     const double min_q = 0.00001;// ref note above
                     if (q < min_q) q = min_q;

@@ -35,6 +35,7 @@ namespace shyft {
                 pts_t snow_outflow;///< gamma snow output [m³/s] for the timestep
                 pts_t ae_output;///< actual evap mm/h
                 pts_t pe_output;///< actual evap mm/h
+				pts_t soil_output;/// < output from the hbv_soil [m^3/s]
                 response_t end_reponse;///<< end_response, at the end of collected
 
                 all_response_collector() : destination_area(0.0) {}
@@ -51,6 +52,7 @@ namespace shyft {
                     snow_outflow = pts_t(time_axis, 0.0);
                     ae_output = pts_t(time_axis, 0.0);
                     pe_output = pts_t(time_axis, 0.0);
+					soil_output = pts_t(time_axis, 0.0);
                 }
 
                 /**\brief Call for each time step, to collect needed information from R
@@ -65,6 +67,7 @@ namespace shyft {
                 //template<class R>
                 void collect(size_t idx, const response_t& response) {
                     avg_discharge.set(idx, mmh_to_m3s(response.total_discharge, destination_area)); // wants m3/s, q_avg is given in mm/h, so compute the totals in  mm/s
+					soil_output.set(idx, mmh_to_m3s(response.soil.outflow, destination_area));
                     snow_sca.set(idx, response.gs.sca);
                     snow_outflow.set(idx, response.gs.outflow); //TODO: current mm/h.. but  want m3/s, but we get mm/h from snow output
                     snow_swe.set(idx, response.gs.storage);
@@ -135,6 +138,7 @@ namespace shyft {
                 pts_t gs_acc_melt;
                 pts_t gs_iso_pot_energy;
                 pts_t gs_temp_swe;
+				pts_t soil_sm;// mm
 
                 state_collector() : collect_state(false), destination_area(0.0) { /* Do nothing */ }
                 state_collector(const timeaxis_t& time_axis)
@@ -147,7 +151,8 @@ namespace shyft {
                    gs_sdc_melt_mean(time_axis, 0.0),
                    gs_acc_melt(time_axis, 0.0),
                    gs_iso_pot_energy(time_axis, 0.0),
-                   gs_temp_swe(time_axis, 0.0)
+                   gs_temp_swe(time_axis, 0.0),
+				   soil_sm(time_axis,0.0)
                    { /* Do nothing */ }
 
                 /** brief called before run, prepares state time-series
@@ -169,6 +174,7 @@ namespace shyft {
                     gs_acc_melt = pts_t(ta, 0.0);
                     gs_iso_pot_energy = pts_t(ta, 0.0);
                     gs_temp_swe = pts_t(ta, 0.0);
+					soil_sm = pts_t(ta, 0.0);
                 }
                 /** called by the cell.run for each new state*/
                 void collect(size_t idx, const state_t& state) {
@@ -182,6 +188,7 @@ namespace shyft {
                         gs_acc_melt.set(idx, state.gs.acc_melt);
                         gs_iso_pot_energy.set(idx, state.gs.iso_pot_energy);
                         gs_temp_swe.set(idx, state.gs.temp_swe);
+						soil_sm.set(idx, state.soil.sm);
                     }
                 }
             };
@@ -190,7 +197,7 @@ namespace shyft {
             typedef cell<parameter_t, environment_t, state_t, null_collector, discharge_collector> cell_discharge_response_t; ///<used for operational or calibration runs, only needed info is collected.
 
         }
-        #ifndef SWIG
+
         //specialize run method for all_response_collector
         template<>
         inline void cell<pt_gs_k::parameter_t, environment_t, pt_gs_k::state_t,
@@ -254,6 +261,5 @@ namespace shyft {
             ::set_snow_sca_swe_collection(bool on_or_off) {
             rc.collect_snow=on_or_off;// possible, if true, we do collect both swe and sca, default is off
         }
-        #endif
     }
 }

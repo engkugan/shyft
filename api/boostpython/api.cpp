@@ -23,6 +23,7 @@ namespace expose {
     extern void interpolation();
     extern void skaugen_snow();
     extern void kalman();
+	extern void hbv_soil();
 
     void api() {
         calendar_and_time();
@@ -43,6 +44,7 @@ namespace expose {
         cell_environment();
         interpolation();
         kalman();
+		hbv_soil();
     }
 }
 

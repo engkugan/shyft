@@ -6,6 +6,7 @@
 #include "core/precipitation_correction.h"
 #include "core/gamma_snow.h"
 #include "core/kirchner.h"
+#include "core/hbv_soil.h"
 #include "core/pt_gs_k.h"
 #include "api/api.h"
 #include "api/pt_gs_k.h"
@@ -33,12 +34,14 @@ namespace expose {
                               "priestley_taylor,gamma_snow,actual_evapotranspiration,precipitation_correction,kirchner\n"
                 )
                 .def(init<priestley_taylor::parameter,gamma_snow::parameter,actual_evapotranspiration::parameter,kirchner::parameter,precipitation_correction::parameter>(args("pt","gs","ae","k","p_corr"),"create object with specified parameters"))
-                .def(init<const parameter&>(args("p"),"clone a parameter"))
+				.def(init<priestley_taylor::parameter, gamma_snow::parameter, actual_evapotranspiration::parameter, kirchner::parameter, precipitation_correction::parameter,hbv_soil::parameter>(args("pt", "gs", "ae", "k", "p_corr","soil"), "create object with specified parameters"))
+				.def(init<const parameter&>(args("p"),"clone a parameter"))
                 .def_readwrite("pt",&parameter::pt,"priestley_taylor parameter")
                 .def_readwrite("gs",&parameter::gs,"gamma-snow parameter")
 				.def_readwrite("ae",&parameter::ae,"actual evapotranspiration parameter")
                 .def_readwrite("kirchner",&parameter::kirchner,"kirchner parameter")
                 .def_readwrite("p_corr",&parameter::p_corr,"precipitation correction parameter")
+				.def_readwrite("soil",&parameter::soil,"Hbv soil routie paramaters")
                 .def("size",&parameter::size,"returns total number of calibration parameters")
                 .def("set",&parameter::set,args("p"),"set parameters from vector/list of float, ordered as by get_name(i)")
                 .def("get",&parameter::get,args("i"),"return the value of the i'th parameter, name given by .get_name(i)")
@@ -52,8 +55,10 @@ namespace expose {
 
             class_<state>("PTGSKState")
                 .def(init<gamma_snow::state,kirchner::state>(args("gs","k"),"initializes state with gamma-snow gs and kirchner k"))
+				.def(init<gamma_snow::state, kirchner::state,hbv_soil::state>(args("gs", "k", "s"), "initializes state with gamma-snow gs and kirchner k, hbv_soil s"))
                 .def_readwrite("gs",&state::gs,"gamma-snow state")
                 .def_readwrite("kirchner",&state::kirchner,"kirchner state")
+				.def_readwrite("soil", &state::soil, "soil state")
                 ;
 
             typedef std::vector<state> PTGSKStateVector;
@@ -68,6 +73,7 @@ namespace expose {
                 .def_readwrite("ae",&response::ae,"actual evapotranspiration response")
                 .def_readwrite("kirchner",&response::kirchner,"kirchner response")
                 .def_readwrite("total_discharge",&response::total_discharge,"total stack response")
+				.def_readwrite("soil",&response::soil,"hbv_soil")
                 ;
         }
 
@@ -83,6 +89,7 @@ namespace expose {
                 .def_readonly("ae_output",&PTGSKAllCollector::ae_output,"actual evap mm/h")
                 .def_readonly("pe_output",&PTGSKAllCollector::pe_output,"pot evap mm/h")
                 .def_readonly("end_reponse",&PTGSKAllCollector::end_reponse,"end_response, at the end of collected")
+				.def_readonly("soil",&PTGSKAllCollector::soil_output,"soil output m3/s")
             ;
 
             typedef shyft::core::pt_gs_k::discharge_collector PTGSKDischargeCollector;
@@ -110,6 +117,7 @@ namespace expose {
                 .def_readonly("gs_acc_melt",&PTGSKStateCollector::gs_acc_melt,"")
                 .def_readonly("gs_iso_pot_energy",&PTGSKStateCollector::gs_iso_pot_energy,"")
                 .def_readonly("gs_temp_swe",&PTGSKStateCollector::gs_temp_swe,"")
+				.def_readonly("soil_sm",&PTGSKStateCollector::soil_sm,"")
             ;
 
         }
@@ -124,6 +132,7 @@ namespace expose {
               expose::statistics::actual_evapotranspiration<PTGSKCellAll>("PTGSKCell");
               expose::statistics::priestley_taylor<PTGSKCellAll>("PTGSKCell");
               expose::statistics::kirchner<PTGSKCellAll>("PTGSKCell");
+			  expose::statistics::hbv_soil<PTGSKCellAll>("PTGSKCell");
         }
 
         static void
