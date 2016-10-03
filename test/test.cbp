@@ -39,7 +39,7 @@
 					<Add directory="../bin/Release" />
 				</Linker>
 				<ExtraCommands>
-					<Add after="cd ../bin/Release &amp;&amp; ./test_shyft  routing_test test_hydrograph" />
+					<Add after="cd ../bin/Release &amp;&amp; ./test_shyft  routing_test test_routing_model" />
 					<Mode after="always" />
 				</ExtraCommands>
 			</Target>
