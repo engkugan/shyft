@@ -88,7 +88,6 @@ namespace shyft {
 				pt.alpha = p[i++];
 				soil.fc = p[i++];
 				soil.beta = p[i++];
-				soil.lp = p[i++];
             }
 
             ///< calibration support, get the value of i'th parameter
@@ -117,7 +116,6 @@ namespace shyft {
 					case 20:return pt.alpha;
 					case 21: return soil.fc;
 					case 22: return soil.beta;
-					case 23: return soil.lp;
                 default:
                     throw runtime_error("PTGSK Parameter Accessor:.get(i) Out of range.");
                 }
@@ -330,7 +328,7 @@ namespace shyft {
                 response.ae.ae = act_evap;
 				// soil layer goes here:
 				// if( geo_cell_data.something), decide action.
-				soil.step(state.soil, response.soil, period.start, period.end, response.gs.outflow, pot_evap, act_evap);
+				soil.step(state.soil, response.soil, period.start, period.end, response.gs.outflow,act_evap);
 				// q_soil=hbv_soil.step(state.hbv_soil, response.gs.outflow);
                 // Use responses from PriestleyTaylor and GammaSnow in Kirchner
                 double q_avg;                                    // q_soil

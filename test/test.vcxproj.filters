@@ -76,6 +76,12 @@
     <ClInclude Include="hbv_soil_test.h">
       <Filter>methods</Filter>
     </ClInclude>
+    <ClInclude Include="hbv_tank_test.h">
+      <Filter>methods</Filter>
+    </ClInclude>
+    <ClInclude Include="hbv_actual_evapotranspiration_test.h">
+      <Filter>methods</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="actual_evapotranspiration_test.cpp">
@@ -154,6 +160,12 @@
       <Filter>interpolation</Filter>
     </ClCompile>
     <ClCompile Include="hbv_soil_test.cpp">
+      <Filter>methods</Filter>
+    </ClCompile>
+    <ClCompile Include="hbv_tank_test.cpp">
+      <Filter>methods</Filter>
+    </ClCompile>
+    <ClCompile Include="hbv_actual_evapotranspiration_test.cpp">
       <Filter>methods</Filter>
     </ClCompile>
   </ItemGroup>

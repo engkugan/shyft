@@ -6,14 +6,13 @@ namespace shyft {
 			using namespace std;
 
 			struct parameter {
-				parameter(double fc = 300.0, double beta = 2.0, double lp = 150) 
-					:fc(fc), beta(beta), lp(lp) {
+				parameter(double fc = 300.0, double beta = 2.0) 
+					:fc(fc), beta(beta) {
 					if (fc < .0) 
 						throw runtime_error("fc should be > 0.0");
 				}
 				double fc=300; // mm
 				double beta=2.0;// unit-less
-				double lp = 150;// mm
 			};
 
 			struct state {
@@ -43,10 +42,11 @@ namespace shyft {
 				P param;
 				calculator(const P& p):param(p) {}
 				template <class R,class S> 
-				void step(S& s, R& r, shyft::core::utctime t0, shyft::core::utctime t1, double insoil, double pot_evap, double act_evap) {
-					double fraction = pow(s.sm / param.fc, param.beta);
+				void step(S& s, R& r, shyft::core::utctime t0, shyft::core::utctime t1, double insoil, double act_evap) {
+					double temp = s.sm + insoil;					//compute fraction at end of time after adding insoil
+					double fraction = pow(temp/param.fc, param.beta);
 					r.outflow = fraction*insoil;
-					s.sm = s.sm - r.outflow + ((1-fraction)*insoil  - (s.sm < param.lp? act_evap:pot_evap ) );
+					s.sm = s.sm + insoil - r.outflow - act_evap;
 				}
 			};
 		}

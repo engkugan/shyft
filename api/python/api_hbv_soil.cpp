@@ -10,10 +10,9 @@ namespace expose {
 		using namespace std;
 
 		class_<parameter>("HbvSoilParameter")
-			.def(init<optional<double, double, double>>(args("fc", "beta", "lp"), "create parameter object with specifed values"))
+			.def(init<optional<double, double>>(args("fc", "beta"), "create parameter object with specifed values"))
 			.def_readwrite("fc", &parameter::fc, "mm, .. , default=300")
 			.def_readwrite("beta", &parameter::beta, ",default=2.0")
-			.def_readwrite("lp", &parameter::lp, "mm, default=50")
 			;
 
 		class_<state>("HbvSoilState")

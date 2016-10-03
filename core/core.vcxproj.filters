@@ -111,6 +111,18 @@
     <ClInclude Include="hbv_soil.h">
       <Filter>methods</Filter>
     </ClInclude>
+    <ClInclude Include="hbv_actual_evapotranspiration.h">
+      <Filter>methods</Filter>
+    </ClInclude>
+    <ClInclude Include="hbv_tank.h">
+      <Filter>methods</Filter>
+    </ClInclude>
+    <ClInclude Include="hbv_stack.h">
+      <Filter>method-stacks</Filter>
+    </ClInclude>
+    <ClInclude Include="hbv_stack_cell_model.h">
+      <Filter>method-stacks</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="methods">
