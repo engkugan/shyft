@@ -863,7 +863,7 @@ void timeseries_test::test_periodic_ts_t() {
 
 	typedef periodic_ts<profile_description, timeaxis> periodic_ts_t;
 	periodic_ts_t pts(v, deltahours(3), ta);
-	
+
 	TS_ASSERT_EQUALS(pts.size(), 1000);
 	TS_ASSERT_EQUALS(pts.index_of(t0), 0);
 }
@@ -937,7 +937,7 @@ void timeseries_test::test_periodic_template_ts() {
 	calendar utc;
 	utctime t0 = utc.time(2015, 1, 1);
 	timeaxis ta(t0, deltahours(10), 1000);
-	
+
 	profile_description pd(t0, dt, pv);
 
 	TS_ASSERT_DELTA(pd(0), pv[0], 1e-9);
@@ -950,10 +950,10 @@ void timeseries_test::test_periodic_template_ts() {
 	TS_ASSERT_EQUALS(fun.value(0), 2.2);
 	TS_ASSERT_EQUALS(fun.value(1), 5.5);
 	TS_ASSERT_EQUALS(fun.value(2), 4.0);
-	// case 1: as case 0, but 
+	// case 1: as case 0, but
 	// t0 of the profile do *not* match the time-axis tstart
 	// and time-of day is also different:
-	// 
+	//
 	profile_description pd1(utc.time(2000,1,1,2), dt, pv);
 	periodic_ts<profile_description, timeaxis> fx(pd1, ta, POINT_AVERAGE_VALUE);
 	TS_ASSERT_EQUALS(fx.value(0), 3.1);// verified using excel
@@ -1034,7 +1034,7 @@ void timeseries_test::test_accumulate_ts_and_accessor() {
 	TS_ASSERT_DELTA(0.5*deltahours(1), ats.value(1), 0.001);
 	// now the ats have some extra feature through it's f(t), operator()
 	TS_ASSERT_DELTA(0.25*deltaminutes(30), ats(t + deltaminutes(30)), 0.0001);
-	// the accessor should be smart, trying to re-use prior computation, I verify the result here, 
+	// the accessor should be smart, trying to re-use prior computation, I verify the result here,
 	TS_ASSERT_DELTA(1.0*deltahours(2), aa.value(2), 0.0001);// and using step-debug to verify it's really doing the right thing
 }
 
@@ -1052,7 +1052,7 @@ void timeseries_test::test_partition_by() {
 	shyft::api::apoint_ts src_a(ta, values, point_interpretation_policy::POINT_AVERAGE_VALUE);// so a is a straight increasing stair-case
 
   // core version : auto mk_time_shift = [](const decltype(src_a)  &ts, utctimespan dt)-> time_shift_ts<decltype(src_a)> {return time_shift(ts,dt);};
-	// below is the raw- time-shift version 
+	// below is the raw- time-shift version
 	auto mk_raw_time_shift = [](const decltype(src_a)& ts, utctimespan dt)->shyft::api::apoint_ts {
 		return shyft::api::apoint_ts(std::make_shared<shyft::api::time_shift_ts>(ts, dt));
 	};
@@ -1089,7 +1089,7 @@ void timeseries_test::test_partition_by() {
 		ty = utc.add(ty, calendar::YEAR, 1);
 	}
 	ty = t;
-	// verify the raw shift case, where the time-axis are just shifted to align same-value at common_t0 time 
+	// verify the raw shift case, where the time-axis are just shifted to align same-value at common_t0 time
 	for (const auto& ts : partitions_raw_shift) {
 		// verify that the value at common_t0, equals value(t0)
 		auto src_ix = src_a.index_of(ty);
@@ -1101,5 +1101,45 @@ void timeseries_test::test_partition_by() {
 		TS_ASSERT_DELTA(v_year_start, double(src_ix), 0.01); // verify we did get the right value
 		ty = utc.add(ty, calendar::YEAR, 1);
 	}
+
+}
+
+void timeseries_test::test_convolution_w() {
+   using namespace shyft::core;
+    using namespace shyft;
+    calendar utc;
+    utctime t0=utc.time(2016,1,1);
+    utctimespan dt=deltahours(1);
+    time_axis::fixed_dt ta(t0,dt,24);
+
+    timeseries::point_ts<decltype(ta)> ts(ta,10.0);
+    for(size_t i=0;i<5;++i) ts.set(10+i,i);
+    std::vector<double> w{0.1,0.15,0.5,0.15,0.1};
+    timeseries::convolve_w_ts<decltype(ts),decltype(w)> cts_first(ts,w,timeseries::convolve_policy::USE_FIRST);
+    timeseries::convolve_w_ts<decltype(ts),decltype(w)> cts_zero(ts,w,timeseries::convolve_policy::USE_ZERO);
+    timeseries::convolve_w_ts<decltype(ts),decltype(w)> cts_nan(ts,w,timeseries::convolve_policy::USE_NAN);
+
+    // first policy will just repeat the first value through the filter, thus equal first 4 steps.
+    TS_ASSERT_DELTA(ts.value(0),cts_first.value(0),0.0001);
+    TS_ASSERT_DELTA(ts.value(1),cts_first.value(1),0.0001);
+    TS_ASSERT_DELTA(ts.value(2),cts_first.value(2),0.0001);
+    TS_ASSERT_DELTA(ts.value(3),cts_first.value(3),0.0001);
+
+    // zero policy will fill in 0 for the values before 0, -loosing some mass.
+    TS_ASSERT_DELTA(cts_zero.value(0),1.0,0.0001);
+    TS_ASSERT_DELTA(cts_zero.value(1),2.5,0.0001);
+    TS_ASSERT_DELTA(cts_zero.value(2),7.5,0.0001);
+    TS_ASSERT_DELTA(cts_zero.value(3),9.0,0.0001);
+    TS_ASSERT_DELTA(cts_zero.value(4),10.0,0.0001);
+
+    // nan policy will fill in nan for the values before 0, -loosing some mass. inserting nan on the output
+    for (size_t i=0;i+1 <w.size();++i)
+        TS_ASSERT(!std::isfinite(cts_nan.value(i)));
+    std::vector<double> expected{10,10,10,10,10,10,10,10,10,10,9,7.6,2.85,2.1,2.0,3.5,5.15,8.4,9.4,10,10,10,10,10};
+    for(size_t i=4;i<w.size();++i) {
+        TS_ASSERT_DELTA(expected[i],cts_first.value(i),0.0001);
+        TS_ASSERT_DELTA(expected[i],cts_zero.value(i),0.0001);
+        TS_ASSERT_DELTA(expected[i],cts_nan.value(i),0.0001);
+    }
 
 }
