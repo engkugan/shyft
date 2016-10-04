@@ -108,6 +108,7 @@
     <ClInclude Include="kalman.h">
       <Filter>interpolation</Filter>
     </ClInclude>
+    <ClInclude Include="routing.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="methods">

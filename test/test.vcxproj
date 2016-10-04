@@ -120,6 +120,7 @@
     <ClInclude Include="gridpp_test.h" />
     <ClInclude Include="kalman_test.h" />
     <ClInclude Include="pt_ss_k_test.h" />
+    <ClInclude Include="routing_test.h" />
     <ClInclude Include="sceua_test.h" />
     <ClInclude Include="test_pch.h" />
     <ClInclude Include="gamma_snow_test.h" />
@@ -155,6 +156,7 @@
     <ClCompile Include="gridpp_test.cpp" />
     <ClCompile Include="kalman_test.cpp" />
     <ClCompile Include="pt_ss_k_test.cpp" />
+    <ClCompile Include="routing_test.cpp" />
     <ClCompile Include="sceua_test.cpp" />
     <ClCompile Include="test_pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
