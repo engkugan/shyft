@@ -5,7 +5,6 @@
 #pragma warning (disable : 4503)
 #endif
 
-
 #include <boost/python/module.hpp>
 #include <boost/python/def.hpp>
 #include <boost/python/args.hpp>

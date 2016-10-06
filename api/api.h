@@ -36,6 +36,7 @@
 #include "core/pt_gs_k_cell_model.h"
 #include "core/pt_hs_k_cell_model.h"
 #include "core/pt_ss_k_cell_model.h"
+#include "core/hbv_stack_cell_model.h"
 
 #include "timeseries.h"
 
@@ -381,6 +382,30 @@ namespace shyft {
 					[](const cell& c) { return c.sc.soil_sm; }, ith_timestep);
 		}
 	};
+
+	template <typename cell>											//To be checked & controlled
+	struct hbv_tank_cell_state_statistics {
+		shared_ptr<vector<cell>> cells;
+		hbv_tank_cell_state_statistics(shared_ptr<vector<cell>> cells) :cells(cells) {}
+
+		apoint_ts discharge(const vector<int>& catchment_indexes) const {
+			return apoint_ts(*shyft::core::cell_statistics::
+				sum_catchment_feature(*cells, catchment_indexes,
+					[](const cell& c) { return c.sc.tank_uz; }));			//to be modified
+		}
+		vector<double> discharge(const vector<int>& catchment_indexes, size_t ith_timestep) const {
+			return shyft::core::cell_statistics::
+				catchment_feature(*cells, catchment_indexes,
+					[](const cell& c) { return c.sc.tank_uz; }, ith_timestep);		//to be modified
+		}
+		double discharge_value(const vector<int>& catchment_indexes, size_t ith_timestep) const {
+			return shyft::core::cell_statistics::
+				sum_catchment_feature_value(*cells, catchment_indexes,
+					[](const cell& c) { return c.sc.tank_uz; }, ith_timestep);			//to be modified
+		}
+	};
+
+
     ///< cells with gamma_snow state collection gives access to time-series for state
     template <typename cell>
     struct gamma_snow_cell_state_statistics {

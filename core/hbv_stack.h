@@ -1,11 +1,12 @@
 #pragma once
 
 #include "priestley_taylor.h"
-#include "hbv_tank.h"
 #include "hbv_snow.h"
-#include "actual_evapotranspiration.h"
-#include "precipitation_correction.h"
+#include "hbv_actual_evapotranspiration.h"
 #include "hbv_soil.h"
+#include "hbv_tank.h"
+#include "precipitation_correction.h"
+
 
 namespace shyft {
 	namespace core {
@@ -26,53 +27,53 @@ namespace shyft {
 			struct parameter {
 				typedef priestley_taylor::parameter pt_parameter_t;
 				typedef hbv_snow::parameter snow_parameter_t;
-				typedef actual_evapotranspiration::parameter ae_parameter_t;
+				typedef hbv_actual_evapotranspiration::parameter ae_parameter_t;
+				typedef hbv_soil::parameter soil_parameter_t;
 				typedef hbv_tank::parameter tank_parameter_t;
 				typedef precipitation_correction::parameter precipitation_correction_parameter_t;
-				typedef hbv_soil::parameter soil_parameter_t;
-
-				pt_parameter_t pt;
-				snow_parameter_t snow;
-				ae_parameter_t ae;
-				tank_parameter_t tank;
-				precipitation_correction_parameter_t p_corr;
-				soil_parameter_t soil;
+				
+				//pt_parameter_t pt;							// I followed pt_gs_k but pt_hs_k differ
+				//snow_parameter_t snow;
+				//ae_parameter_t ae;
+				//soil_parameter_t soil;
+				//tank_parameter_t tank;
+				//precipitation_correction_parameter_t p_corr;
 				
 				parameter(pt_parameter_t pt,
 					snow_parameter_t snow,
-					ae_parameter_t ae,
+					ae_parameter_t ae, 
+					soil_parameter_t soil,
 					tank_parameter_t tank,
-					precipitation_correction_parameter_t p_corr,
-					soil_parameter_t soil)
-					: pt(pt), snow(snow), ae(ae), tank(tank), p_corr(p_corr), soil(soil) { /*Do nothing */
-				}
+					precipitation_correction_parameter_t p_corr)
+					: pt(pt), snow(snow), ae(ae), soil(soil), tank(tank), p_corr(p_corr)  { /*Do nothing */}
 
 				parameter() {}
 				parameter(const parameter& other)
 					: pt(other.pt), snow(other.snow), ae(other.ae),
-					tank(other.tank), p_corr(other.p_corr), soil(other.soil) { /*Do nothing */
-				}
+					soil(other.soil), tank(other.tank), p_corr(other.p_corr)  { /*Do nothing */}
 
-				pt_parameter_t pt;
+				pt_parameter_t pt;						// I followed pt_gs_k but pt_hs_k differ
 				snow_parameter_t snow;
 				ae_parameter_t ae;
+				soil_parameter_t soil;
 				tank_parameter_t  tank;
 				precipitation_correction_parameter_t p_corr;
-				soil_parameter_t soil;
 
 				///<calibration support, needs vector interface to params, size is the total count
-				size_t size() const { return 16 + 1; }
+				size_t size() const { return 16; }
 				///<calibration support, need to set values from ordered vector
 				void set(const vector<double>& p) {
 					if (p.size() != size())
 						throw runtime_error("HBV_Stack Parameter Accessor: .set size missmatch");
 					int i = 0;
+					soil.fc = p[i++];
+					soil.beta = p[i++];
+					ae.lp = p[i++];
 					tank.uz1 = p[i++];
 					tank.kuz2 = p[i++];
 					tank.kuz1 = p[i++];
 					tank.perc = p[i++];
 					tank.klz = p[i++];
-					ae.ae_scale_factor = p[i++];
 					snow.lw = p[i++];
 					snow.tx = p[i++];
 					snow.cx = p[i++];
@@ -81,31 +82,28 @@ namespace shyft {
 					p_corr.scale_factor = p[i++];
 					pt.albedo = p[i++];
 					pt.alpha = p[i++];
-					soil.fc = p[i++];
-					soil.beta = p[i++];
-					soil.lp = p[i++];
+					
 				}
 
 				///< calibration support, get the value of i'th parameter
 				double get(size_t i) const {
 					switch (i) {
-					case  0:return tank.uz1;
-					case  1:return tank.kuz2;
-					case  2:return tank.kuz1;
-					case  3:return tank.perc;
-					case  4:return tank.klz;
-					case  5:return ae.ae_scale_factor;
-					case  6:return snow.lw;
-					case  7:return snow.tx;
-					case  8:return snow.cx;
-					case  9:return snow.ts;
-					case 10:return snow.cfr;
-					case 11:return p_corr.scale_factor;
-					case 12:return pt.albedo;
-					case 13:return pt.alpha;
-					case 14: return soil.fc;
-					case 15: return soil.beta;
-					case 16: return soil.lp;
+					case 0: return soil.fc;
+					case 1: return soil.beta;
+					case 2: return ae.lp;
+					case 3:return tank.uz1;
+					case 4:return tank.kuz2;
+					case 5:return tank.kuz1;
+					case 6:return tank.perc;
+					case 7:return tank.klz;
+					case 8:return snow.lw;
+					case 9:return snow.tx;
+					case 10:return snow.cx;
+					case 11:return snow.ts;
+					case 12:return snow.cfr;
+					case 13:return p_corr.scale_factor;
+					case 14:return pt.albedo;
+					case 15:return pt.alpha;
 					default:
 						throw runtime_error("HBV_stack Parameter Accessor:.get(i) Out of range.");
 					}
@@ -115,12 +113,14 @@ namespace shyft {
 				///< calibration and python support, get the i'th parameter name
 				string get_name(size_t i) const {
 					static const char *names[] = {
+						"soil.fc",
+						"soil.beta",
+						"ae.lp",						
 						"tank.uz1",
 						"tank.kuz2",
 						"tank.kuz1",
 						"tank.perc",
 						"tank.klz",
-						"ae.ae_scale_factor",
 						"snow.lw",
 						"snow.tx",
 						"snow.cx",
@@ -128,10 +128,7 @@ namespace shyft {
 						"snow.cfr",
 						"p_corr.scale_factor",
 						"pt.albedo",
-						"pt.alpha",
-						"soil.fc",
-						"soil.beta",
-						"soil.lp"
+						"pt.alpha"
 					};
 					if (i >= size())
 						throw runtime_error("hbv_stack Parameter Accessor:.get_name(i) Out of range.");
@@ -149,13 +146,13 @@ namespace shyft {
 			*/
 			struct state {
 				typedef hbv_snow::state snow_state_t;
-				typedef hbv_tank::state tank_state_t;
 				typedef hbv_soil::state soil_state_t;
+				typedef hbv_tank::state tank_state_t;
 				state() {}
-				state(snow_state_t snow, tank_state_t tank, soil_state_t soil) : snow(snow), tank(tank), soil(soil) {}
+				state(snow_state_t snow, soil_state_t soil, tank_state_t tank) : snow(snow), soil(soil), tank(tank) {}
 				snow_state_t snow;
-				tank_state_t tank;
 				soil_state_t soil;
+				tank_state_t tank;
 				bool operator==(const state& x) const { return snow == x.snow && tank == x.tank && soil == x.soil; }
 			};
 
@@ -168,15 +165,14 @@ namespace shyft {
 				// Model responses
 				typedef priestley_taylor::response  pt_response_t;
 				typedef hbv_snow::response snow_response_t;
-				typedef actual_evapotranspiration::response  ae_response_t;
-				typedef hbv_tank::response tank_response_t;
+				typedef hbv_actual_evapotranspiration::response  ae_response_t;
 				typedef hbv_soil::response soil_response_t;
+				typedef hbv_tank::response tank_response_t;
 				pt_response_t pt;
 				snow_response_t snow;
 				ae_response_t ae;
-				tank_response_t tank;
 				soil_response_t soil;
-
+				tank_response_t tank;
 
 				// Stack response
 				double total_discharge;
@@ -268,19 +264,26 @@ namespace shyft {
 				// Initialize the method stack
 				precipitation_correction::calculator p_corr(parameter.p_corr.scale_factor);
 				priestley_taylor::calculator pt(parameter.pt.albedo, parameter.pt.alpha);
-				hbv_snow::calculator<typename P::snow_parameter_t, typename S::snow_state_t> hbv_snow(parameter.snow, state.snow);
+				hbv_snow::calculator<typename P::snow_parameter_t, typename S::snow_state_t> snow(parameter.snow, state.snow);
 				// -- 
-				// hbv_soil::calculater<typename P::hbv_soil_paramer_t, typename S::hbv_soil_state, ...> hbv_soil(parameter.hbv_soil);
+				// hbv_soil::calculater<typename P::soil_paramer_t, typename S::soil_state, ...> soil(parameter.soil);
+				// hbv_soil::calculator<typename P::soil_parameter_t> soil(parameter.soil);
 				hbv_soil::calculator<typename P::soil_parameter_t> soil(parameter.soil);
-				hbv_tank::calculator<typename P::tank_parameter_t> tank(parameter.tank);
+				
 				// hbv_tank::calculator<hbv_tank::trapezoidal_average, typename P::hbv_tank_parameter_t> hbv_tank(parameter.hbv_tank);
-				//
-				snow.set_glacier_fraction(geo_cell_data.land_type_fractions_info().glacier());
-				// Get the initial states
+				//hbv_tank::calculator<typename P::tank_parameter_t> tank(parameter.tank);
+				hbv_tank::calculator<typename P::tank_parameter_t> tank(parameter.tank);
+				
+				//snow.set_glacier_fraction(geo_cell_data.land_type_fractions_info().glacier());
+				
+				// Get the initial states					//Check with Prof??	
 				auto &snow_state = state.snow;
-				//double q = state.tank.q;
-				double uz = state.tank.uz; // Check with Prof
-				double lz = state.tank.lz; // Cjeck with Prof
+				//double soil_moisture = state.sm;			// Check with Prof
+				double sm = state.soil.sm;					//Check with Prof				
+				//double water_level = state.tank.water_level;		// Check with Prof
+				double uz = state.tank.uz;							//Check with Prof
+				double lz = state.tank.lz; 
+
 				R response;
 				const double forest_fraction = geo_cell_data.land_type_fractions_info().forest();
 				const double altitude = geo_cell_data.mid_point().z;
@@ -300,37 +303,37 @@ namespace shyft {
 					double pot_evap = pt.potential_evapotranspiration(temp, rad, rel_hum)*calendar::HOUR; // mm/h
 					response.pt.pot_evapotranspiration = pot_evap;
 
-					// Gamma Snow
+					// Hbv Snow
 					//snow.step(snow_state, response.snow, period.start, period.timespan(), parameter.snow,
 					//	temp, rad, prec, wind_speed_accessor.value(i), rel_hum, forest_fraction, altitude);
 					//HBV Snow
-					hbv_snow.step(state.snow, response.snow, period.start, period.end, parameter.snow, prec, temp);
+					snow.step(state.snow, response.snow, period.start, period.end, parameter.snow, prec, temp);
 
 					// TODO: Communicate snow
 					// At my pos xx mm of snow moves in direction d.
 
-					// Actual Evapotranspiration //Check with Prof
-						/*double act_evap = actual_evapotranspiration::calculate_step(q, pot_evap,
-						parameter.ae.ae_scale_factor, response.gs.sca, period.timespan());
+					// Actual Evapotranspiration 
+					double act_evap = hbv_actual_evapotranspiration::calculate_step(state.soil.sm, pot_evap,
+					parameter.ae.lp, state.snow.sca, period.timespan());
 					response.ae.ae = act_evap;
-					*/
+					
 					// soil layer goes here:
 					// if( geo_cell_data.something), decide action.
-					soil.step(state.soil, response.soil, period.start, period.end, response.snow.outflow, pot_evap, act_evap);
-					// q_soil=hbv_soil.step(state.hbv_soil, response.snow.outflow);
-					// Use responses from PriestleyTaylor and HBVSnow in hbv_tank
-					//double q_avg;                                    // q_soil
-					//hbv_tank.step(period.start, period.end, q, q_avg, response.soil.outflow, 0.0, geo_cell_data.urban_area);
-					//state.hbv_tank.q = q; // Save discharge state variable
-					//response.hbv_tank.q_avg = q_avg;
-
-					//
+					// outflow_soil=hbv_soil.step(state.hbv_soil, response.snow.outflow);
+					// Use responses from actual_evaporation and snow outflow in soil
+					soil.step(state.soil, response.soil, period.start, period.end, response.snow.outflow, response.ae.ae);
+					
+					// Use responses from soil_outflow in tank
+					//tank.step(period.start, period.end, q, q_avg, response.soil.outflow, 0.0, geo_cell_data.urban_area);
+					tank.step(state.tank, response.tank, period.start, period.end, response.soil.outflow);
+					//state.kirchner.q = q; // Save discharge state variable //Discuss with Prof??
+					
 					// Adjust land response for lakes and reservoirs (Treat them the same way for now)
 					double total_lake_fraction = geo_cell_data.land_type_fractions_info().lake() +
 						geo_cell_data.land_type_fractions_info().reservoir();
 					double corrected_discharge = prec*total_lake_fraction +
 						response.snow.outflow*geo_cell_data.land_type_fractions_info().glacier() +
-						(1.0 - total_lake_fraction - geo_cell_data.land_type_fractions_info().glacier())*q_avg;
+						(1.0 - total_lake_fraction - geo_cell_data.land_type_fractions_info().glacier())*response.tank.outflow;
 					response.total_discharge = corrected_discharge;
 
 					// Possibly save the calculated values using the collector callbacks.

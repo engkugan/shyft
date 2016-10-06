@@ -82,6 +82,12 @@
     <ClInclude Include="hbv_actual_evapotranspiration_test.h">
       <Filter>methods</Filter>
     </ClInclude>
+    <ClInclude Include="hbv_stack_test.h">
+      <Filter>method-stacks</Filter>
+    </ClInclude>
+    <ClInclude Include="mocks_hbv.h">
+      <Filter>compiler_and_testsupport</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="actual_evapotranspiration_test.cpp">
@@ -167,6 +173,12 @@
     </ClCompile>
     <ClCompile Include="hbv_actual_evapotranspiration_test.cpp">
       <Filter>methods</Filter>
+    </ClCompile>
+    <ClCompile Include="hbv_stack_test.cpp">
+      <Filter>method-stacks</Filter>
+    </ClCompile>
+    <ClCompile Include="mocks_hbv.cpp">
+      <Filter>compiler_and_testsupport</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
