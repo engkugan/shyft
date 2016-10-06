@@ -24,7 +24,7 @@ namespace shyft {
 			* \tparam KState hbv_tank parameter type that implements the parameter interface for hbv_tank.
 			* \sa HBVSnowParameter \sa hbv_tank \sa hbv_stack  \sa PriestleyTaylor
 			*/
-			struct parameter {
+			struct parameter{
 				typedef priestley_taylor::parameter pt_parameter_t;
 				typedef hbv_snow::parameter snow_parameter_t;
 				typedef hbv_actual_evapotranspiration::parameter ae_parameter_t;

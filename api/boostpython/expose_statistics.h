@@ -40,7 +40,7 @@ namespace expose {
 
 		template<class cell>
 		static void hbv_tank(const char *cell_name) {
-			char state_name[200]; sprintf(state_name, "%HbvTankStateStatistics", cell_name);
+			char state_name[200]; sprintf(state_name, "%sHbvTankStateStatistics", cell_name);
 			typedef typename shyft::api::hbv_tank_cell_state_statistics<cell>    sc_stat;
 
 			rts_(sc_stat::*discharge_ts)(cids_) const = &sc_stat::discharge;

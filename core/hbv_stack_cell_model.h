@@ -34,14 +34,14 @@ namespace shyft {
 				pts_t snow_outflow;///< HBV snow output [m³/s] for the timestep
 				pts_t ae_output;///< actual evap mm/h
 				pts_t soil_outflow; ///< Tank outflow given in [m³/s] for the timestep
-				pts_t tank_discharge; ///< Tank outflow given in [m³/s] for the timestep
+				pts_t avg_discharge; ///< Tank outflow given in [m³/s] for the timestep
 				response_t end_reponse;///<< end_response, at the end of collected
 
 				all_response_collector() : destination_area(0.0) {}
 				all_response_collector(const double destination_area) : destination_area(destination_area) {}
 				all_response_collector(const double destination_area, const timeaxis_t& time_axis)
 					: destination_area(destination_area), pe_output(time_axis, 0.0), snow_outflow(time_axis, 0.0), ae_output(time_axis, 0.0), 
-						soil_outflow(time_axis, 0.0), tank_discharge(time_axis, 0.0) {}
+						soil_outflow(time_axis, 0.0), avg_discharge(time_axis, 0.0) {}
 
 				/**\brief called before run to allocate space for results */
 				void initialize(const timeaxis_t& time_axis, double area) {
@@ -50,7 +50,7 @@ namespace shyft {
 					snow_outflow = pts_t(time_axis, 0.0);
 					ae_output = pts_t(time_axis, 0.0);
 					soil_outflow = pts_t(time_axis, 0.0);
-					tank_discharge = pts_t(time_axis, 0.0);
+					avg_discharge = pts_t(time_axis, 0.0);
 				}
 
 				/**\brief Call for each time step, to collect needed information from R
@@ -67,7 +67,7 @@ namespace shyft {
 					snow_outflow.set(idx, response.snow.outflow);//mm ?? //TODO: current mm/h. Want m3/s, but we get mm/h from snow output
 					ae_output.set(idx, response.ae.ae);
 					soil_outflow.set(idx, response.soil.outflow);//mm ?? //TODO: current mm/h. Want m3/s, but we get mm/h from soil output
-					tank_discharge.set(idx, mmh_to_m3s(response.total_discharge, destination_area)); // wants m3/s, outflow is given in mm/h, so compute the totals in  mm/s
+					avg_discharge.set(idx, mmh_to_m3s(response.total_discharge, destination_area)); // wants m3/s, outflow is given in mm/h, so compute the totals in  mm/s
 				}
 				void set_end_response(const response_t& r) { end_reponse = r; }
 			};
@@ -75,7 +75,7 @@ namespace shyft {
 			/** \brief a collector that collects/keep discharge only */
 			struct discharge_collector {
 				double destination_area;
-				pts_t tank_discharge; ///< Discharge given in [m³/s] as the average of the timestep
+				pts_t avg_discharge; ///< Discharge given in [m³/s] as the average of the timestep
 				response_t end_response;///<< end_response, at the end of collected
 				bool collect_snow;
 				pts_t snow_sca;
@@ -84,13 +84,13 @@ namespace shyft {
 				discharge_collector() : destination_area(0.0), collect_snow(false) {}
 				discharge_collector(const double destination_area) : destination_area(destination_area), collect_snow(false) {}
 				discharge_collector(const double destination_area, const timeaxis_t& time_axis)
-					: destination_area(destination_area), tank_discharge(time_axis, 0.0), collect_snow(false),
+					: destination_area(destination_area), avg_discharge(time_axis, 0.0), collect_snow(false),
 					snow_sca(timeaxis_t(time_axis.start(), time_axis.delta(), 0), 0.0),
 					snow_swe(timeaxis_t(time_axis.start(), time_axis.delta(), 0), 0.0) {}
 
 				void initialize(const timeaxis_t& time_axis, double area) {
 					destination_area = area;
-					tank_discharge = pts_t(time_axis, 0.0);
+					avg_discharge = pts_t(time_axis, 0.0);
 					auto ta = collect_snow ? time_axis : timeaxis_t(time_axis.start(), time_axis.delta(), 0);
 					snow_sca = pts_t(ta, 0.0);
 					snow_swe = pts_t(ta, 0.0);
@@ -98,7 +98,7 @@ namespace shyft {
 
 
 				void collect(size_t idx, const response_t& response) {
-					tank_discharge.set(idx, mmh_to_m3s(response.total_discharge, destination_area)); // outflow is given in mm, so compute the totals
+					avg_discharge.set(idx, mmh_to_m3s(response.total_discharge, destination_area)); // outflow is given in mm, so compute the totals
 					if (collect_snow) {
 						snow_sca.set(idx, response.snow.snow_state.sca);
 						snow_swe.set(idx, response.snow.snow_state.swe);

@@ -7,6 +7,7 @@
 #include "priestley_taylor.h"
 #include "pt_gs_k.h"
 #include "pt_hs_k.h"
+#include "hbv_stack.h"
 #include "geo_cell_data.h"
 
 /** \file This file now contains mostly things to provide the PTxxK model,or

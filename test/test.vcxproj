@@ -123,7 +123,6 @@
     <ClInclude Include="hbv_stack_test.h" />
     <ClInclude Include="hbv_tank_test.h" />
     <ClInclude Include="kalman_test.h" />
-    <ClInclude Include="mocks_hbv.h" />
     <ClInclude Include="pt_ss_k_test.h" />
     <ClInclude Include="sceua_test.h" />
     <ClInclude Include="test_pch.h" />
@@ -163,7 +162,6 @@
     <ClCompile Include="hbv_stack_test.cpp" />
     <ClCompile Include="hbv_tank_test.cpp" />
     <ClCompile Include="kalman_test.cpp" />
-    <ClCompile Include="mocks_hbv.cpp" />
     <ClCompile Include="pt_ss_k_test.cpp" />
     <ClCompile Include="sceua_test.cpp" />
     <ClCompile Include="test_pch.cpp">
