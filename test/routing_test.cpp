@@ -16,7 +16,7 @@ namespace shyft {
             template <class ts_t>
             struct cell_node {
 				typedef typename  timeseries::convolve_w_ts<ts_t> output_m3s_t;
-                //geo_cell_data geo;
+                geo_cell_data geo;
                 ts_t discharge_m3s;
                 std::vector<double> uhg() const {
                     return std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
@@ -98,7 +98,7 @@ namespace shyft {namespace timeseries {
 		std::vector<T> tsv;
 		point_interpretation_policy fx_policy; // inherited from ts
 		uniform_sum_ts() :fx_policy(POINT_AVERAGE_VALUE) {}
-		uniform_sum_ts(const uniform_sum_ts& c) :tsv(c.tsv), fx_policy(c.fx_policy),  {}
+		uniform_sum_ts(const uniform_sum_ts& c) :tsv(c.tsv), fx_policy(c.fx_policy)  {}
 			uniform_sum_ts(uniform_sum_ts&&c) :tsv(std::move(c.tsv)), fx_policy(c.fx_policy) {}
 
 		uniform_sum_ts& operator=(const uniform_sum_ts& o) {
