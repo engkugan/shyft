@@ -80,39 +80,123 @@ namespace shyft {
         }
     }
 }
+
+namespace shyft {namespace timeseries {
+
+	/** \brief a sum_ts computes the sum of vector<ts>
+	 *
+	 * Enforces all ts do have at least same number of elements in time-dimension
+	 * Require number of ts >0
+	 * ensure that .value(i) is the sum of all tsv.value(i)
+	 * time-axis equal to tsv[0].time_axis
+	 */
+	template<class T>
+	struct sum_ts {
+		typedef typename T::ta_t ta_t;
+		std::vector<T> tsv;
+		point_interpretation_policy fx_policy; // inherited from ts
+		sum_ts() :fx_policy(POINT_AVERAGE_VALUE) {}
+		sum_ts(const sum_ts& c) :tsv(c.tsv), fx_policy(c.fx_policy),  {}
+		sum_ts(sum_ts&&c) :tsv(std::move(c.tsv)), fx_policy(c.fx_policy) {}
+
+		sum_ts& operator=(const sum_ts& o) {
+			if (this != &o) {
+				tsv = o.tsv;
+				fx_policy = o.fx_policy;
+			}
+			return *this;
+		}
+
+		sum_ts& operator=(sum_ts&& o) {
+			tsv = std::move(o.tsv);
+			fx_policy = o.fx_policy;
+			return *this;
+		}
+
+			//-- useful ct goes here
+		template<class A_>
+		sum_ts(A_ && tsv)
+			:tsv(std::forward<A_>(tsv)),
+			fx_policy(tsv.size()?tsv[0].point_interpretation():shyft::timeseries::POINT_AVERAGE_VALUE)
+		{
+			if (tsv.size() == 0)
+				throw std::runtime_error("vector<ts> size should be > 0");
+			for (size_t i = 1;i < tsv.size();++i)
+				if (tsv[i].size() != tsv[i - 1].size()) // todo: a more extensive test needed, @ to high cost.. so  maybe provide a ta, and do true-average ?
+					throw std::runtime_error("vector<ts> timeaxis should be aligned");
+		}
+
+		const ta_t& time_axis() const { return tsv[0].time_axis(); }
+		point_interpretation_policy point_interpretation() const { return fx_policy; }
+		void set_point_interpretation(point_interpretation_policy point_interpretation) { fx_policy = point_interpretation; }
+
+		point get(size_t i) const { return point(tsv[0].time(i), value(i)); }
+
+		size_t size() const { return tsv[0].size(); }
+		size_t index_of(utctime t) const { return tsv[0].index_of(t); }
+		utcperiod total_period() const { return tsv[0].total_period(); }
+		utctime time(size_t i) const { return tsv[0].time(i); }
+
+		//--
+		double value(size_t i) const {
+			double v = 0;
+			for (size_t j = 0;j < tsv.size();++j)
+				if (j > 0)
+					v += tsv[j].value(i);
+				else
+					v = tsv[j].value(i);
+			return  v;
+		}
+		double operator()(utctime t) const {
+			return value(index_of(t));
+		}
+		std::vector<double> values() const {
+			std::vector<double> r;r.reserve(size());
+			for (size_t i = 0;i < size();++i) r.push_back(value(i));
+			return std::move(r);
+		}
+	};
+// maybe a more convenient function to get the frozen values out:
+template <class Ts>
+std::vector<double> ts_values(const Ts& ts) {
+	std::vector<double> r; r.reserve(ts.size());
+	for (size_t i = 0;i < ts.size();++i) r.push_back(ts.value(i));
+	return std::move(r);
+}
+}
+}
 void routing_test::test_hydrograph() {
+	//
+	//  Just for playing around with sum of routing node response
+	// 
     using ta_t =shyft::time_axis::fixed_dt;
     using ts_t = shyft::timeseries::point_ts<ta_t>;
-	using ats_t = shyft::api::apoint_ts;
+	
+	//using ats_t = shyft::api::apoint_ts;
     using namespace shyft::core;
     //using namespace shyft::timeseries;
-    routing::cell_node<ats_t> c1;
+	using node_t = routing::cell_node<ts_t>;
+	node_t c1;
     calendar utc;
     ta_t ta(utc.time(2016,1,1),deltahours(1),24);
-    c1.discharge_m3s= ats_t(ta,0.0,shyft::timeseries::POINT_AVERAGE_VALUE);
+    c1.discharge_m3s= ts_t(ta,0.0,shyft::timeseries::POINT_AVERAGE_VALUE);
     c1.discharge_m3s.set(0,10.0);
     auto c2 =c1;
     c2.discharge_m3s.set(0,20.0);
 	auto c3 = c1;
 	c3.discharge_m3s.set(0, 5.0);
 	c3.discharge_m3s.set(1, 35.0);
-	std::vector<ats_t> responses;
-	//responses.push_back(ats_t(ta,c1.output_m3s()));
-	//responses.push_back(c2.output_m3s());
-	//responses.push_back(c3.output_m3s());
-	//auto sum_ts = ts_t(ta,0.0,shyft::timeseries::POINT_AVERAGE_VALUE);
-	//for (size_t i = 0;i < responses.size();++i) {
-	//	sum_ts.add( = sum + responses[i];
-	//}
-#if 1
-    auto response1_m3s = c1.output_m3s();
-    auto response2_m3s = c2.output_m3s();
-    auto response_sum_m3s= response1_m3s + response2_m3s;
-    std::cout<<"\nresult\n";
+	std::vector<node_t::output_m3s_t> responses;
+	responses.push_back(c1.output_m3s());
+	responses.push_back(c2.output_m3s());
+	responses.push_back(c3.output_m3s());
+	shyft::timeseries::sum_ts<node_t::output_m3s_t> sum_output_m3s(responses);
+	//std::cout << "\nresult:\n";
     for(size_t i=0;i<ta.size();++i) {
-        std::cout<<i<<"\t"<<c1.discharge_m3s.value(i)<<"\t"<<response1_m3s.value(i)<<"\t"<<response2_m3s.value(i)<<"\t"<<response_sum_m3s.value(i)<<"\n";
+        //std::cout<<i<<"\t"<<c1.output_m3s().value(i)<<"\t"<<c2.output_m3s().value(i)<<"\t"<<c3.output_m3s().value(i)<<"\t"<<sum_output_m3s.value(i)<<"\n";
+		double exepected_value = c1.output_m3s().value(i) + c2.output_m3s().value(i) + c3.output_m3s().value(i);
+		TS_ASSERT_DELTA(exepected_value, sum_output_m3s.value(i), 0.00001);
     }
-#endif 
 
 }
 #include <dlib/graph_utils.h>
