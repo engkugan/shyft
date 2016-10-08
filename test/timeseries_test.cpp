@@ -866,6 +866,8 @@ void timeseries_test::test_periodic_ts_t() {
 
 	TS_ASSERT_EQUALS(pts.size(), 1000);
 	TS_ASSERT_EQUALS(pts.index_of(t0), 0);
+	auto c = 4.0 * pts;// if it compiles, its ok
+	auto d = c*pts;// still ok if  it compiles
 }
 
 void timeseries_test::test_periodic_ts_over_sampled() {
@@ -1014,6 +1016,10 @@ void timeseries_test::test_accumulate_value() {
 	auto y3 = accumulate_value(a, utcperiod(ta.time(0), ta.time(6)), last_ix, tsum, true);// last part of accumulation is nan, so 4 flattens out
 	TS_ASSERT_DELTA(2.0*deltahours(4)+4.0*deltahours(1), y3, 0.0001);
 	// besides, since average_value and friends uses accumulate_value, this function is pretty well tested from those tests.
+	auto c = 2.0 * ats;
+	auto cc = c*c;
+	TS_ASSERT_EQUALS(c.size(),ats.size());
+	TS_ASSERT_EQUALS(cc.size(),ats.size());
 }
 
 void timeseries_test::test_accumulate_ts_and_accessor() {
@@ -1141,5 +1147,9 @@ void timeseries_test::test_convolution_w() {
         TS_ASSERT_DELTA(expected[i],cts_zero.value(i),0.0001);
         TS_ASSERT_DELTA(expected[i],cts_nan.value(i),0.0001);
     }
+    //-- verify it can do some math.
+    //auto c2 = 4.0*cts_first+2.0;
+    //for(size_t i=0;i<c2.size();++i)
+    //    TS_ASSERT_DELTA(4*cts_first.value(i)+2.0,c2.value(i),0.00001);
 
 }

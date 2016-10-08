@@ -2,10 +2,29 @@
 #include "routing_test.h"
 #include "core/timeseries.h"
 #include "core/utctime_utilities.h"
+#include "core/geo_cell_data.h"
 
 namespace shyft {
     namespace core {
         namespace routing {
+
+            /// just for emulating a cell-node that do have
+            /// the needed properties that we will require
+            /// later when promoting the stuff to cell_model
+            /// either by explicit requirement, or by concept
+            template <class ts_t>
+            struct cell_node {
+
+                //geo_cell_data geo;
+                ts_t discharge_m3s;
+                std::vector<double> uhg() const {
+                    return std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
+                }
+                timeseries::convolve_w_ts<ts_t> output_m3s() const {
+                    // return discharge
+                    return timeseries::convolve_w_ts<ts_t>(discharge_m3s,uhg(),timeseries::convolve_policy::USE_ZERO);
+                }
+            };
 
             struct node {
                 // binding information
@@ -61,7 +80,24 @@ namespace shyft {
     }
 }
 void routing_test::test_hydrograph() {
-
+    using ta_t =shyft::time_axis::fixed_dt;
+    using ts_t = shyft::timeseries::point_ts<ta_t>;
+    using namespace shyft::core;
+    //using namespace shyft::timeseries;
+    routing::cell_node<ts_t> c1;
+    calendar utc;
+    ta_t ta(utc.time(2016,1,1),deltahours(1),24);
+    c1.discharge_m3s= ts_t(ta,0.0);
+    c1.discharge_m3s.set(0,10.0);
+    auto c2 =c1;
+    c2.discharge_m3s.set(0,20.0);
+    auto response1_m3s = c1.output_m3s();
+    auto response2_m3s = c2.output_m3s();
+    auto response_sum_m3s= response1_m3s + response2_m3s;
+    std::cout<<"\nresult\n";
+    for(size_t i=0;i<ta.size();++i) {
+        std::cout<<i<<"\t"<<c1.discharge_m3s.value(i)<<"\t"<<response1_m3s.value(i)<<"\t"<<response2_m3s.value(i)<<"\t"<<response_sum_m3s.value(i)<<"\n";
+    }
 // moved
 
 }

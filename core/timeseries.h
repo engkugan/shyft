@@ -441,9 +441,11 @@ namespace shyft{
 		 */
 		template<class PD, class TA>
 		struct periodic_ts {
+		    typedef TA ta_t;
 			TA ta;
 			profile_accessor<TA> pa;
 			point_interpretation_policy fx_policy;
+            const TA& time_axis() const {return ta;}
 
 			periodic_ts(const PD& pd, const TA& ta, point_interpretation_policy policy = point_interpretation_policy::POINT_AVERAGE_VALUE) :
 				ta(ta), pa(pd, ta,policy), fx_policy(policy) {}
@@ -487,7 +489,7 @@ namespace shyft{
          * \tparam Ts any time-series
          * \tparam W any container with .size() and [i] operator
          */
-        template<class Ts,class W>
+        template<class Ts,class W=std::vector<double>>
         struct convolve_w_ts {
             typedef typename Ts::ta_t ta_t;
             Ts ts;
@@ -570,7 +572,7 @@ namespace shyft{
             TA ta;
             point_interpretation_policy fx_policy;
             const TA& time_axis() const {return ta;}
-
+            size_t size() const {return ta.size();}
             template<class A_,class B_>
             bin_op(A_&& lhsx,O op,B_&& rhsx):op(op),lhs(forward<A_>(lhsx)),rhs(forward<B_>(rhsx)) {
                 ta=time_axis::combine(d_ref(lhs).time_axis(),d_ref(rhs).time_axis());
@@ -610,6 +612,7 @@ namespace shyft{
                 fx_policy = d_ref(rhs).fx_policy;
             }
 
+            size_t size() const {return ta.size();}
             double operator()(utctime t) const {return op(lhs,d_ref(rhs)(t));}
             double value(size_t i) const {return op(lhs,d_ref(rhs).value(i));}
         };
@@ -629,6 +632,7 @@ namespace shyft{
                 ta=d_ref(lhs).time_axis();
                 fx_policy = d_ref(lhs).fx_policy;
             }
+            size_t size() const {return ta.size();}
             double operator()(utctime t) const {return op(d_ref(lhs)(t),rhs);}
             double value(size_t i) const {return op(d_ref(lhs).value(i),rhs);}
         };
@@ -668,6 +672,16 @@ namespace shyft{
 
         template<class TS,class TA> struct is_ts<average_ts<TS,TA>> {static const bool value=true;};
         template<class TS,class TA> struct is_ts<shared_ptr<average_ts<TS,TA>>> {static const bool value=true;};
+
+        template<class TS,class TA> struct is_ts<accumulate_ts<TS,TA>> {static const bool value=true;};
+        template<class TS,class TA> struct is_ts<shared_ptr<accumulate_ts<TS,TA>>> {static const bool value=true;};
+
+        template<class TS,class W> struct is_ts<convolve_w_ts<TS,W>> {static const bool value=true;};
+        template<class TS,class W> struct is_ts<shared_ptr<convolve_w_ts<TS,W>>> {static const bool value=true;};
+
+        template<class PD, class TA> struct is_ts<periodic_ts<PD,TA>> {static const bool value=true;};
+        template<class PD, class TA> struct is_ts<shared_ptr<periodic_ts<PD,TA>>> {static const bool value=true;};
+
         template<class A, class B, class O, class TA> struct is_ts< bin_op<A,B,O,TA> > {static const bool value=true;};
 
 
