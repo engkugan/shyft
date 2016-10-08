@@ -89,17 +89,19 @@ namespace shyft {namespace timeseries {
 	 * Require number of ts >0
 	 * ensure that .value(i) is the sum of all tsv.value(i)
 	 * time-axis equal to tsv[0].time_axis
+	 *
+	 * TODO: Should we provide alternate approach supplying the time-axis to  align the 'column'-values ?
 	 */
 	template<class T>
-	struct sum_ts {
+	struct uniform_sum_ts {
 		typedef typename T::ta_t ta_t;
 		std::vector<T> tsv;
 		point_interpretation_policy fx_policy; // inherited from ts
-		sum_ts() :fx_policy(POINT_AVERAGE_VALUE) {}
-		sum_ts(const sum_ts& c) :tsv(c.tsv), fx_policy(c.fx_policy),  {}
-		sum_ts(sum_ts&&c) :tsv(std::move(c.tsv)), fx_policy(c.fx_policy) {}
+		uniform_sum_ts() :fx_policy(POINT_AVERAGE_VALUE) {}
+		uniform_sum_ts(const uniform_sum_ts& c) :tsv(c.tsv), fx_policy(c.fx_policy),  {}
+			uniform_sum_ts(uniform_sum_ts&&c) :tsv(std::move(c.tsv)), fx_policy(c.fx_policy) {}
 
-		sum_ts& operator=(const sum_ts& o) {
+		uniform_sum_ts& operator=(const uniform_sum_ts& o) {
 			if (this != &o) {
 				tsv = o.tsv;
 				fx_policy = o.fx_policy;
@@ -107,7 +109,7 @@ namespace shyft {namespace timeseries {
 			return *this;
 		}
 
-		sum_ts& operator=(sum_ts&& o) {
+		uniform_sum_ts& operator=(uniform_sum_ts&& o) {
 			tsv = std::move(o.tsv);
 			fx_policy = o.fx_policy;
 			return *this;
@@ -115,7 +117,7 @@ namespace shyft {namespace timeseries {
 
 			//-- useful ct goes here
 		template<class A_>
-		sum_ts(A_ && tsv)
+		uniform_sum_ts(A_ && tsv)
 			:tsv(std::forward<A_>(tsv)),
 			fx_policy(tsv.size()?tsv[0].point_interpretation():shyft::timeseries::POINT_AVERAGE_VALUE)
 		{
@@ -190,7 +192,7 @@ void routing_test::test_hydrograph() {
 	responses.push_back(c1.output_m3s());
 	responses.push_back(c2.output_m3s());
 	responses.push_back(c3.output_m3s());
-	shyft::timeseries::sum_ts<node_t::output_m3s_t> sum_output_m3s(responses);
+	shyft::timeseries::uniform_sum_ts<node_t::output_m3s_t> sum_output_m3s(responses);
 	//std::cout << "\nresult:\n";
     for(size_t i=0;i<ta.size();++i) {
         //std::cout<<i<<"\t"<<c1.output_m3s().value(i)<<"\t"<<c2.output_m3s().value(i)<<"\t"<<c3.output_m3s().value(i)<<"\t"<<sum_output_m3s.value(i)<<"\n";
