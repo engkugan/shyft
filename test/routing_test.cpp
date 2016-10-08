@@ -3,6 +3,7 @@
 #include "core/timeseries.h"
 #include "core/utctime_utilities.h"
 #include "core/geo_cell_data.h"
+#include "api/timeseries.h"
 
 namespace shyft {
     namespace core {
@@ -14,7 +15,7 @@ namespace shyft {
             /// either by explicit requirement, or by concept
             template <class ts_t>
             struct cell_node {
-
+				typedef typename  timeseries::convolve_w_ts<ts_t> output_m3s_t;
                 //geo_cell_data geo;
                 ts_t discharge_m3s;
                 std::vector<double> uhg() const {
@@ -82,15 +83,28 @@ namespace shyft {
 void routing_test::test_hydrograph() {
     using ta_t =shyft::time_axis::fixed_dt;
     using ts_t = shyft::timeseries::point_ts<ta_t>;
+	using ats_t = shyft::api::apoint_ts;
     using namespace shyft::core;
     //using namespace shyft::timeseries;
-    routing::cell_node<ts_t> c1;
+    routing::cell_node<ats_t> c1;
     calendar utc;
     ta_t ta(utc.time(2016,1,1),deltahours(1),24);
-    c1.discharge_m3s= ts_t(ta,0.0);
+    c1.discharge_m3s= ats_t(ta,0.0,shyft::timeseries::POINT_AVERAGE_VALUE);
     c1.discharge_m3s.set(0,10.0);
     auto c2 =c1;
     c2.discharge_m3s.set(0,20.0);
+	auto c3 = c1;
+	c3.discharge_m3s.set(0, 5.0);
+	c3.discharge_m3s.set(1, 35.0);
+	std::vector<ats_t> responses;
+	//responses.push_back(ats_t(ta,c1.output_m3s()));
+	//responses.push_back(c2.output_m3s());
+	//responses.push_back(c3.output_m3s());
+	//auto sum_ts = ts_t(ta,0.0,shyft::timeseries::POINT_AVERAGE_VALUE);
+	//for (size_t i = 0;i < responses.size();++i) {
+	//	sum_ts.add( = sum + responses[i];
+	//}
+#if 1
     auto response1_m3s = c1.output_m3s();
     auto response2_m3s = c2.output_m3s();
     auto response_sum_m3s= response1_m3s + response2_m3s;
@@ -98,7 +112,7 @@ void routing_test::test_hydrograph() {
     for(size_t i=0;i<ta.size();++i) {
         std::cout<<i<<"\t"<<c1.discharge_m3s.value(i)<<"\t"<<response1_m3s.value(i)<<"\t"<<response2_m3s.value(i)<<"\t"<<response_sum_m3s.value(i)<<"\n";
     }
-// moved
+#endif 
 
 }
 #include <dlib/graph_utils.h>

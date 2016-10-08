@@ -1118,7 +1118,7 @@ void timeseries_test::test_convolution_w() {
     utctimespan dt=deltahours(1);
     time_axis::fixed_dt ta(t0,dt,24);
 
-    timeseries::point_ts<decltype(ta)> ts(ta,10.0);
+    timeseries::point_ts<decltype(ta)> ts(ta,10.0,shyft::timeseries::POINT_AVERAGE_VALUE);
     for(size_t i=0;i<5;++i) ts.set(10+i,i);
     std::vector<double> w{0.1,0.15,0.5,0.15,0.1};
     timeseries::convolve_w_ts<decltype(ts),decltype(w)> cts_first(ts,w,timeseries::convolve_policy::USE_FIRST);
@@ -1148,8 +1148,12 @@ void timeseries_test::test_convolution_w() {
         TS_ASSERT_DELTA(expected[i],cts_nan.value(i),0.0001);
     }
     //-- verify it can do some math.
-    //auto c2 = 4.0*cts_first+2.0;
-    //for(size_t i=0;i<c2.size();++i)
-    //    TS_ASSERT_DELTA(4*cts_first.value(i)+2.0,c2.value(i),0.00001);
+    auto c2 = 4.0*cts_first+2.0;
+	auto cc = c2*c2;
+	for (size_t i = 0;i < c2.size();++i) {
+		double expected_value = 4 * cts_first.value(i) + 2.0;
+		TS_ASSERT_DELTA(expected_value, c2.value(i), 0.00001);
+		TS_ASSERT_DELTA(expected_value*expected_value, cc.value(i), 0.00001);
+	}
 
 }

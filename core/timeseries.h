@@ -498,8 +498,8 @@ namespace shyft{
             convolve_policy policy=convolve_policy::USE_FIRST;
             //-- default stuff, ct/copy etc goes here
             convolve_w_ts():fx_policy(POINT_AVERAGE_VALUE) {}
-            convolve_w_ts(const convolve_w_ts& c):ts(c.ts),fx_policy(c.fx_policy),policy(c.policy) {}
-            convolve_w_ts(convolve_w_ts&&c):ts(std::move(c.ts)),fx_policy(c.fx_policy),policy(c.policy) {}
+            convolve_w_ts(const convolve_w_ts& c):ts(c.ts),fx_policy(c.fx_policy),policy(c.policy),w(c.w) {}
+            convolve_w_ts(convolve_w_ts&&c):ts(std::move(c.ts)),fx_policy(c.fx_policy),policy(c.policy),w(std::move(c.w)) {}
 
             convolve_w_ts& operator=(const convolve_w_ts& o) {
                 if(this != &o) {
