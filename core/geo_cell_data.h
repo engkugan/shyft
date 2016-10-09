@@ -71,7 +71,7 @@ namespace shyft {
          * the cell and the routing sink point */
         struct routing_info {
             int id=0; ///< target routing input identifier (similar to catchment_id), 0 means nil,none
-            double distance=1.0; ///< static routing distance[m] to the routing point
+            double distance=0.0; ///< static routing distance[m] to the routing point
             double velocity=1.0; ///< static 'velocity' parameter[m/s], s= v*t, t=s/v, t= avg. travel time[s]
         };
 

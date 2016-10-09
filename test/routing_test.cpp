@@ -4,10 +4,28 @@
 #include "core/utctime_utilities.h"
 #include "core/geo_cell_data.h"
 #include "api/timeseries.h"
+#include <boost/math/distributions/gamma.hpp>
 
 namespace shyft {
     namespace core {
         namespace routing {
+
+			std::vector<double>  make_uhg_from_gamma(int n_steps, double alpha, double beta) {
+				using boost::math::gamma_distribution;
+				gamma_distribution<double> gdf(alpha, beta);
+				std::vector<double> r;r.reserve(n_steps);
+				double s = 0.0;
+				double d = 1.0 / double(n_steps);
+				for (double q = d;q < 1.0; q += d) {
+					double x = quantile(gdf, q);
+					double y = pdf(gdf, x);
+					s += y;
+					r.push_back(y);
+				}
+				for (auto& y : r) y /= s;
+				if (r.size() == 0) r.push_back(1.0);// at a minimum 1.0, no delay
+				return std::move(r);
+			};
 
             /// just for emulating a cell-node that do have
             /// the needed properties that we will require
@@ -18,12 +36,14 @@ namespace shyft {
 				typedef typename  timeseries::convolve_w_ts<ts_t> output_m3s_t;
                 geo_cell_data geo;
                 ts_t discharge_m3s;
-                std::vector<double> uhg() const {
-                    return std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
+                std::vector<double> uhg(utctimespan dt) const {
+					double steps = (geo.routing.distance / geo.routing.velocity)/dt;// time = distance / velocity[s] // dt[s]
+					int n_steps = int(steps + 0.5);
+					return make_uhg_from_gamma(n_steps, 3.0, 0.7);//std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
                 }
                 timeseries::convolve_w_ts<ts_t> output_m3s() const {
                     // return discharge
-                    return timeseries::convolve_w_ts<ts_t>(discharge_m3s,uhg(),timeseries::convolve_policy::USE_ZERO);
+                    return timeseries::convolve_w_ts<ts_t>(discharge_m3s,uhg(discharge_m3s.time_axis().delta()),timeseries::convolve_policy::USE_ZERO);
                 }
             };
 
@@ -179,13 +199,16 @@ void routing_test::test_hydrograph() {
     //using namespace shyft::timeseries;
 	using node_t = routing::cell_node<ts_t>;
 	node_t c1;
-    calendar utc;
+	c1.geo.routing.distance = 10000;
+	c1.geo.routing.velocity = c1.geo.routing.distance / (10 * 3600.0);// takes 10 hours to propagate the distance
+	calendar utc;
     ta_t ta(utc.time(2016,1,1),deltahours(1),24);
     c1.discharge_m3s= ts_t(ta,0.0,shyft::timeseries::POINT_AVERAGE_VALUE);
     c1.discharge_m3s.set(0,10.0);
-    auto c2 =c1;
+
+    auto c2 =c1;c2.geo.routing.distance = 5 * 1000;
     c2.discharge_m3s.set(0,20.0);
-	auto c3 = c1;
+	auto c3 = c1; c3.geo.routing.distance = 1 * 1000;
 	c3.discharge_m3s.set(0, 5.0);
 	c3.discharge_m3s.set(1, 35.0);
 	std::vector<node_t::output_m3s_t> responses;
@@ -193,9 +216,9 @@ void routing_test::test_hydrograph() {
 	responses.push_back(c2.output_m3s());
 	responses.push_back(c3.output_m3s());
 	shyft::timeseries::uniform_sum_ts<node_t::output_m3s_t> sum_output_m3s(responses);
-	//std::cout << "\nresult:\n";
+	std::cout << "\nresult:\n";
     for(size_t i=0;i<ta.size();++i) {
-        //std::cout<<i<<"\t"<<c1.output_m3s().value(i)<<"\t"<<c2.output_m3s().value(i)<<"\t"<<c3.output_m3s().value(i)<<"\t"<<sum_output_m3s.value(i)<<"\n";
+        std::cout<<i<<"\t"<<c1.output_m3s().value(i)<<"\t"<<c2.output_m3s().value(i)<<"\t"<<c3.output_m3s().value(i)<<"\t"<<sum_output_m3s.value(i)<<"\n";
 		double exepected_value = c1.output_m3s().value(i) + c2.output_m3s().value(i) + c3.output_m3s().value(i);
 		TS_ASSERT_DELTA(exepected_value, sum_output_m3s.value(i), 0.00001);
     }
