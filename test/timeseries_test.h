@@ -33,6 +33,7 @@ public:
 	void test_accumulate_ts_and_accessor();
 	void test_partition_by();
 	void test_convolution_w();
+	void test_uniform_sum_ts();
 };
 
 

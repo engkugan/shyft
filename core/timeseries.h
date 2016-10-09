@@ -555,6 +555,84 @@ namespace shyft{
             }
         };
 
+		/** \brief a sum_ts computes the sum ts  of vector<ts>
+		*
+		* Enforces all ts do have at least same number of elements in time-dimension
+		* Require number of ts >0
+		* computes .value(i) so that it is the sum of all tsv.value(i)
+		* time-axis equal to tsv[0].time_axis
+		* time-axis should be equal, notice that only .size() is equal is ensured in the constructor
+		*
+		* \note The current approach only works for ts of same type, enforced by the compiler
+		*  The runtime enforces that each time-axis are equal as well, and throws exception
+		*  if not (in the non-default construtor), - if user later modifies the tsv
+		*  it could break this assumption.
+		*/
+		template<class T>
+		struct uniform_sum_ts {
+			typedef typename T::ta_t ta_t;
+		private:
+			std::vector<T> tsv; ///< need this private to ensure consistency after creation
+		public:
+			point_interpretation_policy fx_policy; // inherited from ts
+			uniform_sum_ts() :fx_policy(POINT_AVERAGE_VALUE) {}
+			uniform_sum_ts(const uniform_sum_ts& c) :tsv(c.tsv), fx_policy(c.fx_policy) {}
+			uniform_sum_ts(uniform_sum_ts&&c) :tsv(std::move(c.tsv)), fx_policy(c.fx_policy) {}
+
+			uniform_sum_ts& operator=(const uniform_sum_ts& o) {
+				if (this != &o) {
+					tsv = o.tsv;
+					fx_policy = o.fx_policy;
+				}
+				return *this;
+			}
+
+			uniform_sum_ts& operator=(uniform_sum_ts&& o) {
+				tsv = std::move(o.tsv);
+				fx_policy = o.fx_policy;
+				return *this;
+			}
+
+			//-- useful ct goes here
+			template<class A_>
+			uniform_sum_ts(A_ && tsv)
+				:tsv(std::forward<A_>(tsv)),
+				fx_policy(tsv.size() ? tsv[0].point_interpretation() : shyft::timeseries::POINT_AVERAGE_VALUE) {
+				if (tsv.size() == 0)
+					throw std::runtime_error("vector<ts> size should be > 0");
+				for (size_t i = 1;i < tsv.size();++i)
+					if (!(tsv[i].time_axis() == tsv[i - 1].time_axis())) // todo: a more extensive test needed, @ to high cost.. so  maybe provide a ta, and do true-average ?
+						throw std::runtime_error("vector<ts> timeaxis should be aligned in sizes and numbers");
+			}
+
+			const ta_t& time_axis() const { return tsv[0].time_axis(); }
+			point_interpretation_policy point_interpretation() const { return fx_policy; }
+			void set_point_interpretation(point_interpretation_policy point_interpretation) { fx_policy = point_interpretation; }
+
+			point get(size_t i) const { return point(tsv[0].time(i), value(i)); }
+
+			size_t size() const { return tsv.size() ? tsv[0].size() : 0; }
+			size_t index_of(utctime t) const { return tsv.size() ? tsv[0].index_of(t) : std::string::npos; }
+			utcperiod total_period() const { return tsv.size() ? [0].total_period() : utcperiod(); }
+			utctime time(size_t i) const { if (tsv.size()) return tsv[0].time(i); throw std::runtime_error("uniform_sum_ts:empty sum"); }
+
+			//--
+			double value(size_t i) const {
+				if (tsv.size() == 0 || i == std::string::npos) return shyft::nan;
+				double v = tsv[0].value(i);
+				for (size_t j = 1;j < tsv.size();++j) v += tsv[j].value(i);
+				return  v;
+			}
+			double operator()(utctime t) const {
+				return value(index_of(t));
+			}
+			std::vector<double> values() const {
+				std::vector<double> r;r.reserve(size());
+				for (size_t i = 0;i < size();++i) r.push_back(value(i));
+				return std::move(r);
+			}
+		};
+
         /** \brief Basic math operators
          *
          * Here we take a very direct approach, just create a bin_op object for
@@ -669,6 +747,9 @@ namespace shyft{
         template<class T> struct is_ts<shared_ptr<point_ts<T>>> {static const bool value=true;};
         template<class T> struct is_ts<time_shift_ts<T>> {static const bool value=true;};
         template<class T> struct is_ts<shared_ptr<time_shift_ts<T>>> {static const bool value=true;};
+		template<class T> struct is_ts<uniform_sum_ts<T>> { static const bool value = true; };
+		template<class T> struct is_ts<shared_ptr<uniform_sum_ts<T>>> { static const bool value = true; };
+
 
         template<class TS,class TA> struct is_ts<average_ts<TS,TA>> {static const bool value=true;};
         template<class TS,class TA> struct is_ts<shared_ptr<average_ts<TS,TA>>> {static const bool value=true;};

@@ -16,7 +16,7 @@ namespace shyft {
          *
          *   notice:
          *      a) the most usual time-axis is the fixed_dt time-axis
-         *         in the SHyFT core, this is the one we use(could even need a highspeed-nocompromise version)
+         *         in the SHyFT core, this is the one we use(could even need a high-speed-no-compromise version)
          *
          *      b) continuous/dense time-axis: there are no holes in total_period
          *                               types: fixed_dt, calendar_dt, point_dt
@@ -39,6 +39,28 @@ namespace shyft {
         struct continuous<true> {
             static const bool value = true;
         };
+
+		/** generic test if two different time-axis types resembles the same conceptual time-axis
+		*
+		* Given time-axis are of differnt types (point, versus period versus fixed_dt etc.)
+		* just compare and see if they produces the same number of periods, and that each
+		* period is equal.
+		*/
+		template<class A, class B>
+		typename std::enable_if<!std::is_same<A, B>::value, bool>::type
+			equivalent_time_axis(const A& a, const B& b) {
+			if (a.size() != b.size())
+				return false;
+			for (size_t i = 0;i < a.size();++i) { if (a.period(i) != b.period(i)) return false; }
+			return true;
+		}
+		/** Specialization of the equivalent_time_axis given that they are of the same type.
+		*  In this case we forward the comparison to the type it self relying on the
+		*  fact that the time_axis it self knows how to fastest figure out if it's equal.
+		*/
+		template <class A, class B>
+		typename std::enable_if<std::is_same<A, B>::value, bool>::type
+			equivalent_time_axis(const A& a, const B&b) { return a == b; }
 
 
         /**\brief a simple regular time-axis, starting at t, with n consecutive periods of fixed length dt
@@ -64,7 +86,8 @@ namespace shyft {
                 if( i < n ) return t + i * dt;
                 throw std::out_of_range( "fixed_dt.time(i)" );
             }
-
+			bool operator==(const fixed_dt& other) const {return t==other.t && dt== other.dt && n==other.n;}
+			bool operator!=(const fixed_dt& other) const { return !this->operator==(other); }
             utcperiod period( size_t i ) const {
                 if( i < n ) return utcperiod( t + i * dt, t + ( i + 1 ) * dt );
                 throw std::out_of_range( "fixed_dt.period(i)" );
@@ -112,7 +135,9 @@ namespace shyft {
                 }
                 return *this;
             }
-
+			/** equality, notice that calendar is equal if they refer to exactly same calendar pointer */
+			bool operator==(const calendar_dt& other) const { return cal.get()== other.cal.get() && t == other.t && dt == other.dt && n == other.n; }
+			bool operator!=(const calendar_dt& other) const { return !this->operator==(other); }
             size_t size() const {return n;}
 
             utcperiod total_period() const {
@@ -183,7 +208,8 @@ namespace shyft {
 			}
 
             size_t size() const {return t.size();}
-
+			bool operator==(const point_dt &other)const {return t == other.t && t_end == other.t_end;}
+			bool operator!=(const point_dt& other) const { return !this->operator==(other); }
             utcperiod total_period() const {
                 return t.size() == 0 ?
                        utcperiod( min_utctime, min_utctime ) :  // maybe just a non-valid period?
@@ -254,7 +280,7 @@ namespace shyft {
             point_dt p;
             //---------------
             generic_dt(): gt( FIXED ) {}
-            // provide convinience constructors, to directly create the wanted time-axis, regardless underlying rep.
+            // provide convenience constructors, to directly create the wanted time-axis, regardless underlying rep.
             generic_dt( utctime t0,utctimespan dt,size_t n):gt(FIXED),f(t0,dt,n) {}
             generic_dt( const shared_ptr<const calendar>& cal, utctime t, utctimespan dt, size_t n ) : gt(CALENDAR),c(cal,t,dt,n) {}
             generic_dt( const vector<utctime>& t, utctime t_end ):gt(POINT),p(t,t_end) {}
@@ -265,6 +291,18 @@ namespace shyft {
             generic_dt( const point_dt& p ): gt( POINT ), p( p ) {}
             // --
             bool is_fixed_dt() const {return gt != POINT;}
+			bool operator==(const generic_dt& other) const {
+				if (gt != other.gt) {// they are represented differently:
+					switch (gt) {
+					default:
+					case FIXED: return equivalent_time_axis(f, other);
+					case CALENDAR: return equivalent_time_axis(c, other);
+					case POINT: return equivalent_time_axis(p, other);
+					}
+				} // else they have same-representation, use equality directly
+				switch (gt) { default: case FIXED: return f == other.f; case CALENDAR: return c==other.c; case POINT: return p == other.p; }
+			}
+			bool operator!=(const generic_dt& other) const { return !this->operator==(other); }
 
             size_t size() const          {switch( gt ) {default: case FIXED: return f.size(); case CALENDAR: return c.size(); case POINT: return p.size();}}
             utcperiod total_period() const  {switch( gt ) {default: case FIXED: return f.total_period(); case CALENDAR: return c.total_period(); case POINT: return p.total_period();}}
@@ -342,6 +380,8 @@ namespace shyft {
 
             size_t size() const { return cta.size() * ( p.size() ? p.size() : 1 );}
 
+			bool operator==(const calendar_dt_p& other)const { return p==other.p && cta== other.cta;}
+			bool operator!=(const calendar_dt_p& other) const { return !this->operator==(other); }
             utcperiod total_period() const {
                 if( p.size() == 0 || cta.size() == 0 )
                     return cta.total_period();
@@ -418,7 +458,8 @@ namespace shyft {
                 return r;
             }
             size_t size() const {return p.size();}
-
+			bool operator==(const period_list& other) const {return p == other.p;}
+			bool operator!=(const period_list& other) const { return !this->operator==(other); }
             utcperiod total_period() const {
                 return p.size() == 0 ?
                        utcperiod( min_utctime, min_utctime ) :  // maybe just a non-valid period?
@@ -485,6 +526,8 @@ namespace shyft {
                 return period_list();
             }
         };
+
+
 
         /** \brief fast&efficient combine for two fixed_dt time-axis */
         inline fixed_dt combine( const fixed_dt& a, const fixed_dt& b )  {

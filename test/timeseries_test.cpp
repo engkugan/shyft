@@ -1157,3 +1157,40 @@ void timeseries_test::test_convolution_w() {
 	}
 
 }
+
+void timeseries_test::test_uniform_sum_ts() {
+	using namespace shyft::core;
+	using namespace shyft;
+	// arrange the stuff, a vector of n ts, - with values equal to the rank in the vector
+	calendar utc;
+	utctime t0 = utc.time(2016, 1, 1);
+	utctimespan dt = deltahours(1);
+	time_axis::fixed_dt ta(t0, dt, 24);
+	size_t n = 10;
+	using ts_t = timeseries::point_ts<decltype(ta)>;
+	vector<ts_t> tsv;
+	for (size_t i = 0;i < n;++i) {
+		tsv.emplace_back(ta, double(i), shyft::timeseries::POINT_AVERAGE_VALUE);
+		for (size_t t = 0;t < ta.size();++t) {
+			tsv.back().set(t, double(i) + double(t) / 1000.0);// just  ensure variation along time-axis as well.
+		}
+	}
+	// act
+	timeseries::uniform_sum_ts<ts_t> sum_ts(tsv);
+	//assert it works like we expect.
+	TS_ASSERT(equivalent_time_axis(sum_ts.time_axis(), ta));
+	for (size_t t = 0;t < ta.size();++t) {
+		double expected_value = tsv[0].value(t);
+		for (size_t j = 1;j < tsv.size();++j)
+			expected_value += tsv[j].value(t);
+		TS_ASSERT_DELTA(expected_value, sum_ts.value(t), 0.000001);
+		TS_ASSERT_DELTA(expected_value, sum_ts(ta.time(t)), 0.000001);
+	}
+	// and we would like expressions to work as well:
+	auto c = sum_ts * 4.0 + 2.0; // if it compiles
+	auto cc = sum_ts + sum_ts;
+	for (size_t t = 0;t < ta.size();++t) {
+		TS_ASSERT_DELTA(sum_ts.value(t)*4.0 + 2.0, c.value(t), 0.0001);
+		TS_ASSERT_DELTA(sum_ts.value(t)+sum_ts.value(t), cc.value(t), 0.0001);
+	}
+}
