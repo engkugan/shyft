@@ -613,7 +613,7 @@ namespace shyft{
 
 			size_t size() const { return tsv.size() ? tsv[0].size() : 0; }
 			size_t index_of(utctime t) const { return tsv.size() ? tsv[0].index_of(t) : std::string::npos; }
-			utcperiod total_period() const { return tsv.size() ? [0].total_period() : utcperiod(); }
+			utcperiod total_period() const { return tsv.size() ? tsv[0].total_period() : utcperiod(); }
 			utctime time(size_t i) const { if (tsv.size()) return tsv[0].time(i); throw std::runtime_error("uniform_sum_ts:empty sum"); }
 
 			//--
