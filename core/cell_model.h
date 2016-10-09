@@ -85,6 +85,7 @@ namespace shyft {
 
 		template< class P, class E, class S, class SC, class RC>
 		struct cell {
+			typedef pts_t ts_t; ///< export what we use as core result time-series
 			typedef P parameter_t;///< export the parameter type so we can use it elsewhere
 			typedef E env_ts_t;   ///< export the env_ts type so we can use it elsewhere
 			typedef S state_t;    ///< export the state type ..

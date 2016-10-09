@@ -112,7 +112,6 @@ namespace shyft {
         * \tparam TSA  time-series accessor to use for converting the ts to the execution time-axis.
         * \tparam TA   time-axis \ref shyft::timeseries::timeaxis that goes into the constructor of TSA object
         */
-        #ifndef SWIG
         template <class GPTS, class TSA, class TA>
         class idw_compliant_geo_point_ts {
             const GPTS& s; //< type geo_point_ts, and reference is ok because we use this almost internally... hm.. in run_idw_interpolation, (so we should define it there..)
@@ -124,7 +123,6 @@ namespace shyft {
             geo_point mid_point() const { return s.mid_point(); }
             double value(size_t i) const { return tsa.value(i); }
         };
-        #endif
 
         /** \brief region_environment contains the measured/forecasted sources of
         *  environmental properties, each that contains a geo_point and a time-series
@@ -617,7 +615,7 @@ namespace shyft {
                 cr.clear();
                 cr.reserve(n_catchments);
                 for(size_t i=0;i<n_catchments;++i) {
-                    cr.emplace_back(ts_t(time_axis, 0.0));
+                    cr.emplace_back(time_axis, 0.0,timeseries::POINT_AVERAGE_VALUE);
                 }
                 for(const auto& c: *cells) {
                     if ( is_calculated_by_catchment_ix(c.geo.catchment_ix))

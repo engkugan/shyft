@@ -230,7 +230,6 @@ namespace shyft {
          * \tparam RC Response collector type that implements:
          *    - RC.collect(utctime t, const R& response) --> Possibly save some responses at time t.
          */
-#ifndef SWIG
         template<template <typename, typename> class A, class R, class T_TS, class P_TS, class WS_TS, class RH_TS, class RAD_TS, class T,
         class S, class GCD, class P, class SC, class RC>
         void run_pt_gs_k(const GCD& geo_cell_data,
@@ -321,7 +320,6 @@ namespace shyft {
             }
             response_collector.set_end_response(response);
         }
-#endif
     } // pt_gs_k
   } // core
 } // shyft
