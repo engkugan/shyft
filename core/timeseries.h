@@ -523,7 +523,7 @@ namespace shyft{
             template<class A_,class W_>
             convolve_w_ts(A_ && ts,W_ && w, convolve_policy policy=convolve_policy::USE_FIRST)
                 :ts(std::forward<A_>(ts)),
-                 fx_policy(ts.point_interpretation()),
+                 fx_policy(POINT_AVERAGE_VALUE),//TODO: resolve issue apoint_ts method vs. property in core::ts
                  w(std::forward<W_>(w)),
                  policy(policy)
                   {}

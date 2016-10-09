@@ -8,6 +8,23 @@
 #include <iomanip>
 
 namespace shyft {
+	namespace timeseries {
+
+
+		// maybe a more convenient function to get the frozen values out,
+		// then we don't have to write this more than once,
+		// except for the rare cases where we would like to specialize it:
+
+		template <class Ts>
+		std::vector<double> ts_values(const Ts& ts) {
+			std::vector<double> r; r.reserve(ts.size());
+			for (size_t i = 0;i < ts.size();++i) r.push_back(ts.value(i));
+			return std::move(r);
+		}
+
+	}
+}
+namespace shyft {
     namespace core {
         namespace routing {
 
@@ -15,8 +32,36 @@ namespace shyft {
 			 * containing n_steps, given the gamma shape factor alpha and beta.
 			 * ensuring the sum of the weight vector is 1.0
 			 * and that it has a min-size of one element (1.0)
+			 *
+			 * Later we can replace the implementation of this to depend on the configured parameters of the
+			 * model.
+			 * 
+			 * There are some variations of how this is created, and how it is applied.
+			 * Notice that there are two stages in the routing:
+			 *  First from the cells to the first routing points,
+			 *  Then output form the routing points can be cascaded to form 
+			 *  larger units (rivers etc), e.g. simulating a simple river-network.
+			 *  
+			 *  One or more routing-points can be classified as 'observation routing points',
+			 *  that is, a place where we have an observation(or a simulated observation).
+			 * 
+			 *
+			 * #1 Using cell.geo.routing velocity and distance along with catchment-specific shape parameters.
+			 *    routing down to the first routing point is then determined by each cell along with possibly
+			 *    catchment specific shape/routing parameters.
+			 *
+			 * #2 Skaugen: sum together all cell-responses that belong to a routing point, then
+			 *    use distance distribution profile to generate a uhg that together with convolution
+			 *    determines the response out from those cells to the first routing point
+			 *
+			 * #3 time-delay-zones: Group cells output to routing time-delay points,with no local delay.
+			 *   then use a response function that take the shape and time-delay characteristics for the group
+			 *   to the 'observation routing point'
+			 *
+			 *  A number of various routing methods can be utilized, we start out with a simple uhg, 
+			 *  and convolution to create the output response.
+			 * 
 			 */
-
 			std::vector<double>  make_uhg_from_gamma(int n_steps, double alpha, double beta) {
 				using boost::math::gamma_distribution;
 				gamma_distribution<double> gdf(alpha, beta);
@@ -34,10 +79,13 @@ namespace shyft {
 				return std::move(r);
 			};
 
-            /// just for emulating a cell-node that do have
-            /// the needed properties that we will require
-            /// later when promoting the stuff to cell_model
-            /// either by explicit requirement, or by concept
+			/** cell_node, a workbench stand-in for a typical shyft::core::cell_model
+             *
+			 * Just for emulating a cell-node that do have
+             * the needed properties that we will require
+             * later when promoting the stuff to cell_model
+             *  either by explicit requirement, or by concept
+			 */
             template <class Ts>
             struct cell_node {
 				typedef Ts ts_t;
@@ -76,6 +124,7 @@ namespace shyft {
                 //  so providing some handles do make sense for now.
                 int id;// self.id, >0 means valid id, 0= null
 				shyft::core::routing_info downstream;
+				// here we could have a link to the observed time-series (can use the self.id to associate)
 				std::vector<double> uhg(utctimespan dt) const {
 					double steps = (downstream.distance / downstream.velocity) / dt;// time = distance / velocity[s] // dt[s]
 					int n_steps = int(steps + 0.5);
@@ -83,122 +132,88 @@ namespace shyft {
 				}
             };
 
-            // routing network
-            // vector<rn> rn
-            //  1) a map<int,node> of identified nodes,
-            //     with identified down-streams
-            //     cells have routing id to this network.
-            //  2) bind to cells
-            //
-            //
+            /** A simple routing model 
+			 *
+			 *
+			 * Based on shaping the routing using repeated convolution a unit hydro-graph.
+			 * First from the lateral local cells that feeds into the routing-point (creek).
+			 * Then add up the flow from the upstream routing points(they might or might not have local-cells, upstreams routes etc.)
+			 * Then finally compute output as the convolution using the uhg of the sum_inflow to the node.
+			 * \tparam C 
+			 *  Cell type that should provide 
+			 *  -# C::ts_t the current core time-series representation, currently point_ts<fixed_dt>..
+			 *  -# C::output_m3s_t the type of the call C::output_m3s() const (we could rater use result_of..)
+			 * 
+			 * \note implementation:
+			 *    technically we are currently flattening out the ts-expression tree.
+			 *    later we could utilize a dynamic dispatch to to build the recursive
+			 *    accumulated expression tree at any node in the routing graph.
+			 * 
+			 */
+
             template<class C>
             struct model {
 				typedef typename C::ts_t rts_t; // the result computed in the cell.rc.avg_discharge [m3/s]
-				typedef typename C::output_m3s_t ots_t;
-				typedef typename shyft::timeseries::uniform_sum_ts<ots_t> sum_ts_t;
-				std::map<int, node> node_map; // keeps structure and routing properties
-				std::shared_ptr<std::vector<C>> cells;
+				typedef typename C::output_m3s_t ots_t; // the output result from the cell, it's a convolution_w_ts<rts_t>..
+				//typedef typename shyft::timeseries::uniform_sum_ts<ots_t> sum_ts_t;
+				
+				std::map<int, node> node_map; ///< keeps structure and routing properties
 
-				/** compute the local lateral inflow from connected shyft-cells into given node-id */
-				sum_ts_t local_inflow(int node_id) const {
-					std::vector<ots_t> tsv;tsv.reserve(cells->size());// make room for all
+				std::shared_ptr<std::vector<C>> cells; ///< shared with the region_model !
+				timeseries::timeaxis ta;///< shared with the region_model,  should be simulation time-axis
+
+				/** compute the local lateral inflow from connected shyft-cells into given node-id 
+				 *
+				 */
+				rts_t local_inflow(int node_id) const {
+					rts_t r(ta,0.0,timeseries::POINT_AVERAGE_VALUE);// default null to null ts.
 					for (const auto& c : *cells) {
-						if (c.geo.routing.id == node_id)
-							tsv.push_back(c.output_m3s());
+						if (c.geo.routing.id == node_id) {
+							auto node_output_m3s = c.output_m3s();
+							for (size_t t = 0;t < r.size();++t)
+								r.add(t, node_output_m3s.value(t));
+						}
 					}
-					if (tsv.size() == 0) { // would be nice with a default convolve_w_ts(0.0) here,. for now we hack a 0.0 response, later we can avoid this entirely
-						//ts_t nts((*cells)[0].discharge_ts.time_axis(), 0.0, shyft::timeseries::POINT_AVERAGE_VALUE);
-						//std::vector<double> w;w.push_back(1.0);
-						//tsv.push_back(ots_t(nts, w));
-						throw std::runtime_error("routing::model: requested node_id has no local inflow");
-					}
-					return std::move(sum_ts_t(std::move(tsv)));
+					return std::move(r);
 				}
-				bool has_local_inflow(int node_id) const {
-					for (const auto& c : *cells) if (c.geo.routing.id == node_id) return true;
-					return false;
-				}
-				bool has_upstream_inflow(int node_id) const {
-					for (const auto&i : node_map)
-						if ( i.second.downstream.id == node_id) return true;
-					return false;
-				}
-#if 0
-                /** compute the local lateral inflow from connected shyft-cells into given node-id */
-				sum_ts_t upstream_inflow(int node_id) const {
-					std::vector<ots_t> tsv;tsv.reserve(node_map.size());// make room for all
+
+				/** Aggregate the upstream inflow that flows into this cell
+				 * Notice that this is a recursive function that will go upstream
+				 * and collect *all* upstream flow
+				 */
+				rts_t upstream_inflow(int node_id) const {
+					rts_t r(ta, 0.0, timeseries::POINT_AVERAGE_VALUE);
 					for (const auto& i : node_map) {
-						if ( i.second.downstream.id == node_id)
-							tsv.push_back(output_m3s(i.first));
+						if (i.second.downstream.id == node_id) {
+							auto flow_m3s = output_m3s(i.first);
+							for (size_t t = 0;t < ta.size();++t) 
+								r.add(t, flow_m3s.value(t));
+						}
 					}
-					if (tsv.size() == 0) { // would be nice with a default convolve_w_ts(0.0) here,. for now we hack a 0.0 response, later we can avoid this entirely
-						throw std::runtime_error("routing::model: requested node_id has no upstream inflow");
-					}
-					return std::move(sum_ts_t(std::move(tsv)));
+					return std::move(r);
 				}
 
-				// will not go through compiler, since the expressions have different types for
-				// cases
-				//  local & upstream
-				//  local only
-				//  upstream only
-				// additionally, the recursive dimension creates separate type-trees for each level upstream.
-				// so we either need to create 3 methods (one for each case)
-				//   plus using result_of ..
-				// or flatten out the result by extracting ts_values
-				// or go to dynamic dispatch for the ts.
-
-				ots_t output_m3s(int node_id) const {
-
-					if (has_local_inflow(node_id) && has_upstream_inflow(node_id)) {
-						auto sum_inflow = local_inflow(node_id) + upstream_inflow(node_id);
-						utctimespan dt=sum_inflow.time_axis().delta();
-						return timeseries::convolve_w_ts(sum_inflow, node_map[node_id].uhg(dt),timeseries::POINT_AVERAGE...)
-					} else if (has_local_inflow(node_id)) {
-						auto sum_inflow = local_inflow(node_id) ;
-						utctimespan dt = sum_inflow.time_axis().delta();
-						return timeseries::convolve_w_ts(sum_inflow, node_map[node_id].uhg(dt), timeseries::POINT_AVERAGE...)
-					} else if (has_upstream_inflow(node_id)) {
-
-					} else {
-						throw std::runtime_error("routing::model: requested node has no upstream or local cell inflow");
-					}
+				/** Utilizing the local_inflow and upstream_inflow function,
+				 * calculate the output_m3s leaving the specified node.
+				 * This is a walk in the park, since we can just use
+				 * already existing (possibly recursive) functions to do the work.
+				 */
+				rts_t output_m3s(int node_id) const {
+					utctimespan dt = ta.delta(); // for now need to pick up delta from the sources
+					std::vector<double> uhg_weights = node_map.at(node_id).uhg(dt);
+					auto sum_input_m3s = local_inflow(node_id)+ upstream_inflow(node_id);
+					auto response = timeseries::convolve_w_ts<decltype(sum_input_m3s)>(sum_input_m3s, uhg_weights, timeseries::convolve_policy::USE_ZERO);
+					return std::move(rts_t(ta, timeseries::ts_values(response), timeseries::POINT_AVERAGE_VALUE)); // flatten values 
 				}
 
-
-
-											  // input cells..
-                rts_t input_ts(int node_id /*cell begin..end */) {
-                    // find all nodes with this as down_stream
-                    // ask those nodes for
-                    // .response_ts(..)
-                    // return us1.response_ts()+..us2.response_ts();
-                    return rts_t();
-                }
-                rts_t output_ts(int node_id) {
-                    // return (local_ts(node_id) + input_ts(node_id)).convolve(w)
-                    return rts_t();
-
-                }
-#endif
             };
 
         }
     }
 }
 
-namespace shyft {namespace timeseries {
 
 
-// maybe a more convenient function to get the frozen values out:
-template <class Ts>
-std::vector<double> ts_values(const Ts& ts) {
-	std::vector<double> r; r.reserve(ts.size());
-	for (size_t i = 0;i < ts.size();++i) r.push_back(ts.value(i));
-	return std::move(r);
-}
-}
-}
 void routing_test::test_hydrograph() {
 	//
 	//  Just for playing around with sum of routing node response
@@ -237,6 +252,9 @@ void routing_test::test_hydrograph() {
     }
 
 }
+
+//-- consider using dlib graph to do the graph stuff
+
 #include <dlib/graph_utils.h>
 #include <dlib/graph.h>
 #include <dlib/directed_graph.h>
@@ -245,22 +263,72 @@ void routing_test::test_routing_model() {
     using namespace shyft::core;
 	using ta_t = shyft::time_axis::fixed_dt;
 	using ts_t = shyft::timeseries::point_ts<ta_t>;
-
-    routing::model<routing::cell_node<ts_t>> m;
-    // simple network
+	using cell_t = routing::cell_node<ts_t>;
+    // setup a simple network
     // a->b-> d
     //    c-/
+	//
+	// node a and c do have local inflow through cell_t (alias shyft region model cell)
+	// node b is just a routing transport node
+	// node d is an endpoint node, observation point routing node where we
+	// would like to observed the local_inflow + the upstream_inflow
+	// --
+	// for now we just set routing parameters to 
+	// values suitable for demo and verification
+	//--
+	calendar utc;
+	ta_t ta(utc.time(2016, 1, 1), deltahours(1), 24);
+	int a_id = 1;
+	int b_id = 2;
+	int c_id = 3;
+	int d_id = 4;
 
-	routing::node a{ 1,routing_info(2) };
-	routing::node b{ 2,routing_info(4) };
-	routing::node c{ 3,routing_info(4) };
-	routing::node d{ 4,routing_info(0) };
+	// build the shyft region model cells (we use local types here, so we have maximum control)
+	auto cells = std::make_shared<std::vector<cell_t>>();
+	cell_t cx;
+	cx.geo.routing.id = a_id;
+	cx.geo.routing.distance = 10000;
+	cx.geo.routing.velocity = cx.geo.routing.distance / (10 * 3600.0);// takes 10 hours to propagate the distance
+	cx.discharge_m3s= ts_t(ta, 0.0, shyft::timeseries::POINT_AVERAGE_VALUE);
+	cx.discharge_m3s.set(0, 10.0);// set 10 m3/s at timestep 0.
+	cells->push_back(cx); //ship it to cell-vector
+	cx.geo.routing.velocity = cx.geo.routing.distance / (7 * 3600.0);// takes 7 hours to propagate the distance
+	cx.discharge_m3s = ts_t(ta, 0.0, shyft::timeseries::POINT_AVERAGE_VALUE);
+	cx.discharge_m3s.set(0, 7.0);
+	cx.discharge_m3s.set(6, 6.0); // a second pulse after 6 hours
+	cells->push_back(cx);
+	cx.geo.routing.id = c_id;// route it to cell c
+	cx.geo.routing.velocity = cx.geo.routing.distance / (24 * 3600.0);// takes 14 hours to propagate the distance
+	cx.discharge_m3s = ts_t(ta, 0.0, shyft::timeseries::POINT_AVERAGE_VALUE);
+	cx.discharge_m3s.set(0, 50.0);// just one large pulse, that will spread over 24 hours
+	cells->push_back(cx);
+
+	// build the routing network as described, 
+	routing::node a{ a_id,routing_info(b_id, 2*3600.0, 1.0) };// two hour delay from
+	routing::node b{ b_id,routing_info(d_id, 0,1.0) }; // give zero delay
+	routing::node c{ c_id,routing_info(d_id, 3600.0, 1.0) };// give one hour delay
+	routing::node d{ d_id,routing_info(0) }; // here is our observation point node
+
+	routing::model<cell_t> m;
+	m.cells = cells;
+	m.ta = ta;
     m.node_map[a.id]=a;
     m.node_map[b.id]=b;
     m.node_map[c.id]=c;
     m.node_map[d.id]=d;
-	TS_ASSERT(m.has_upstream_inflow(2));
-	TS_ASSERT(!m.has_upstream_inflow(1));
+
+	/// now, with the model in place, including some fake-timeseries at cell-level, we can expect things to happen:
+	// for now just print out the response
+	auto observation_m3s = m.local_inflow(d_id) + m.upstream_inflow(d_id);// this arrives into node d:
+	std::cout << "Resulting response at observation node d:\n";
+	std::cout << "timestep\t d.flow.[m3s]\n";
+	for (size_t t = 0; t < observation_m3s.size();++t) {
+		std::cout << t << "\t" << std::setprecision(2) << observation_m3s.value(t) << std::endl;
+	}
+
+#if 0
+	// this is what we can easily do with dlib
+	// 
     dlib::directed_graph<routing::node>::kernel_1a_c md;
     md.set_number_of_nodes(4);
     md.add_edge(0,1);
@@ -275,4 +343,5 @@ void routing_test::test_routing_model() {
     TS_ASSERT_EQUALS( md.node(0).number_of_parents(),0);
     TS_ASSERT_EQUALS( md.node(0).number_of_children(),1);
     TS_ASSERT_EQUALS( md.node(3).number_of_children(),0);
+#endif
 }
