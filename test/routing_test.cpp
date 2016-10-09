@@ -38,9 +38,9 @@ namespace shyft {
             /// the needed properties that we will require
             /// later when promoting the stuff to cell_model
             /// either by explicit requirement, or by concept
-            template <class ts_t>
+            template <class Ts>
             struct cell_node {
-				typedef ts_t ts_t;
+				typedef Ts ts_t;
 				typedef typename  timeseries::convolve_w_ts<ts_t> output_m3s_t;
                 geo_cell_data geo;
                 ts_t discharge_m3s;
@@ -60,7 +60,7 @@ namespace shyft {
 
 			/**\brief A routing node
 			 *
-			 * The routing node have flow from 
+			 * The routing node have flow from
 			 * -# zero or more 'cell_nodes',  typically a cell_model type, lateral flow (.output_m3s())
 			 * -# zero or more upstream connected routing nodes, taking their inputs (.output_m3s())
 			 * then a routing node can be connected to a down-stream node,
@@ -123,7 +123,8 @@ namespace shyft {
 						if ( i.second.downstream.id == node_id) return true;
 					return false;
 				}
-				/** compute the local lateral inflow from connected shyft-cells into given node-id */
+#if 0
+                /** compute the local lateral inflow from connected shyft-cells into given node-id */
 				sum_ts_t upstream_inflow(int node_id) const {
 					std::vector<ots_t> tsv;tsv.reserve(node_map.size());// make room for all
 					for (const auto& i : node_map) {
@@ -135,8 +136,8 @@ namespace shyft {
 					}
 					return std::move(sum_ts_t(std::move(tsv)));
 				}
-#if 0
-				// will not go through compiler, since the expressions have different types for 
+
+				// will not go through compiler, since the expressions have different types for
 				// cases
 				//  local & upstream
 				//  local only
@@ -144,7 +145,7 @@ namespace shyft {
 				// additionally, the recursive dimension creates separate type-trees for each level upstream.
 				// so we either need to create 3 methods (one for each case)
 				//   plus using result_of ..
-				// or flatten out the result by extracting ts_values 
+				// or flatten out the result by extracting ts_values
 				// or go to dynamic dispatch for the ts.
 
 				ots_t output_m3s(int node_id) const {
@@ -201,10 +202,10 @@ std::vector<double> ts_values(const Ts& ts) {
 void routing_test::test_hydrograph() {
 	//
 	//  Just for playing around with sum of routing node response
-	// 
+	//
     using ta_t =shyft::time_axis::fixed_dt;
     using ts_t = shyft::timeseries::point_ts<ta_t>;
-	
+
 	//using ats_t = shyft::api::apoint_ts;
     using namespace shyft::core;
     //using namespace shyft::timeseries;

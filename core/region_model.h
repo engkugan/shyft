@@ -611,7 +611,6 @@ namespace shyft {
              */
             template <class TSV>
             void catchment_discharges( TSV& cr) const {
-                typedef typename TSV::value_type ts_t;
                 cr.clear();
                 cr.reserve(n_catchments);
                 for(size_t i=0;i<n_catchments;++i) {
