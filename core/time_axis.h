@@ -47,8 +47,7 @@ namespace shyft {
 		* period is equal.
 		*/
 		template<class A, class B>
-		typename std::enable_if<!std::is_same<A, B>::value, bool>::type
-			equivalent_time_axis(const A& a, const B& b) {
+		bool equivalent_time_axis(const A& a, const B& b) {
 			if (a.size() != b.size())
 				return false;
 			for (size_t i = 0;i < a.size();++i) { if (a.period(i) != b.period(i)) return false; }
@@ -58,9 +57,8 @@ namespace shyft {
 		*  In this case we forward the comparison to the type it self relying on the
 		*  fact that the time_axis it self knows how to fastest figure out if it's equal.
 		*/
-		template <class A, class B>
-		typename std::enable_if<std::is_same<A, B>::value, bool>::type
-			equivalent_time_axis(const A& a, const B&b) { return a == b; }
+		template <class A>
+		bool equivalent_time_axis(const A& a, const A&b) { return a == b; }
 
 
         /**\brief a simple regular time-axis, starting at t, with n consecutive periods of fixed length dt
