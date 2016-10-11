@@ -70,12 +70,11 @@ namespace shyft {
         /** The routing_info contains the geo-static parts of the relation between
          * the cell and the routing sink point */
         struct routing_info {
-			routing_info(int destination_id=0, double distance = 0.0, double velocity = 1.0) :
-				id(destination_id), distance(distance), velocity(velocity) {
+			routing_info(int destination_id=0, double distance = 0.0) :
+				id(destination_id), distance(distance) {
 			}
 			int id=0; ///< target routing input identifier (similar to catchment_id), 0 means nil,none
             double distance=0.0; ///< static routing distance[m] to the routing point
-            double velocity=1.0; ///< static 'velocity' parameter[m/s], s= v*t, t=s/v, t= avg. travel time[s]
         };
 
         const double default_radiation_slope_factor=0.9;

@@ -35,16 +35,16 @@ namespace shyft {
              *
              * Later we can replace the implementation of this to depend on the configured parameters of the
              * model.
-             * 
+             *
              * There are some variations of how this is created, and how it is applied.
              * Notice that there are two stages in the routing:
              *  First from the cells to the first routing points,
-             *  Then output form the routing points can be cascaded to form 
+             *  Then output form the routing points can be cascaded to form
              *  larger units (rivers etc), e.g. simulating a simple river-network.
-             *  
+             *
              *  One or more routing-points can be classified as 'observation routing points',
              *  that is, a place where we have an observation(or a simulated observation).
-             * 
+             *
              *
              * #1 Using cell.geo.routing velocity and distance along with catchment-specific shape parameters.
              *    routing down to the first routing point is then determined by each cell along with possibly
@@ -58,9 +58,9 @@ namespace shyft {
              *   then use a response function that take the shape and time-delay characteristics for the group
              *   to the 'observation routing point'
              *
-             *  A number of various routing methods can be utilized, we start out with a simple uhg, 
+             *  A number of various routing methods can be utilized, we start out with a simple uhg,
              *  and convolution to create the output response.
-             * 
+             *
              */
             std::vector<double>  make_uhg_from_gamma(int n_steps, double alpha, double beta) {
                 using boost::math::gamma_distribution;
@@ -78,7 +78,11 @@ namespace shyft {
                 if (r.size() == 0) r.push_back(1.0);// at a minimum 1.0, no delay
                 return std::move(r);
             };
-
+            struct cell_parameter {
+                double velocity=0.0;
+                double alpha =3.0;
+                double beta = 0.7;
+            };
             /** cell_node, a workbench stand-in for a typical shyft::core::cell_model
              *
              * Just for emulating a cell-node that do have
@@ -90,15 +94,16 @@ namespace shyft {
             struct cell_node {
                 typedef Ts ts_t;
                 typedef typename  timeseries::convolve_w_ts<ts_t> output_m3s_t;
+                cell_parameter parameter;
                 geo_cell_data geo;
                 ts_t discharge_m3s;
                 /**create a unit hydro graph weight vector for the cell-node utilizing the
                  *  cell geo.specific routing information, distance&speed.
                  */
                 std::vector<double> uhg(utctimespan dt) const {
-                    double steps = (geo.routing.distance / geo.routing.velocity)/dt;// time = distance / velocity[s] // dt[s]
+                    double steps = (geo.routing.distance / parameter.velocity)/dt;// time = distance / velocity[s] // dt[s]
                     int n_steps = int(steps + 0.5);
-                    return std::move(make_uhg_from_gamma(n_steps, 3.0, 0.7));//std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
+                    return std::move(make_uhg_from_gamma(n_steps, parameter.alpha, parameter.beta));//std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
                 }
                 timeseries::convolve_w_ts<ts_t> output_m3s() const {
                     // return discharge, notice that this function assumes that time_axis() do have a uniform delta() (requirement)
@@ -106,6 +111,12 @@ namespace shyft {
                 }
             };
 
+            struct node_parameter {
+                node_parameter(double velocity=1.0,double alpha=3.0,double beta=0.7):velocity(velocity),alpha(alpha),beta(beta) {}
+                double velocity= 1.0;
+                double alpha=3.0;
+                double beta =0.7;
+            };
             /**\brief A routing node
              *
              * The routing node have flow from
@@ -124,31 +135,32 @@ namespace shyft {
                 //  so providing some handles do make sense for now.
                 int id;// self.id, >0 means valid id, 0= null
                 shyft::core::routing_info downstream;
+                node_parameter parameter;
                 // here we could have a link to the observed time-series (can use the self.id to associate)
                 std::vector<double> uhg(utctimespan dt) const {
-                    double steps = (downstream.distance / downstream.velocity) / dt;// time = distance / velocity[s] // dt[s]
+                    double steps = (downstream.distance / parameter.velocity) / dt;// time = distance / velocity[s] // dt[s]
                     int n_steps = int(steps + 0.5);
-                    return std::move(make_uhg_from_gamma(n_steps, 3.0, 0.7));//std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
+                    return std::move(make_uhg_from_gamma(n_steps, parameter.alpha, parameter.beta));//std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
                 }
             };
 
-            /** A simple routing model 
+            /** A simple routing model
              *
              *
              * Based on shaping the routing using repeated convolution a unit hydro-graph.
              * First from the lateral local cells that feeds into the routing-point (creek).
              * Then add up the flow from the upstream routing points(they might or might not have local-cells, upstreams routes etc.)
              * Then finally compute output as the convolution using the uhg of the sum_inflow to the node.
-             * \tparam C 
-             *  Cell type that should provide 
+             * \tparam C
+             *  Cell type that should provide
              *  -# C::ts_t the current core time-series representation, currently point_ts<fixed_dt>..
              *  -# C::output_m3s_t the type of the call C::output_m3s() const (we could rater use result_of..)
-             * 
+             *
              * \note implementation:
              *    technically we are currently flattening out the ts-expression tree.
              *    later we could utilize a dynamic dispatch to to build the recursive
              *    accumulated expression tree at any node in the routing graph.
-             * 
+             *
              */
 
             template<class C>
@@ -156,13 +168,13 @@ namespace shyft {
                 typedef typename C::ts_t rts_t; // the result computed in the cell.rc.avg_discharge [m3/s]
                 typedef typename C::output_m3s_t ots_t; // the output result from the cell, it's a convolution_w_ts<rts_t>..
                 //typedef typename shyft::timeseries::uniform_sum_ts<ots_t> sum_ts_t;
-                
+
                 std::map<int, node> node_map; ///< keeps structure and routing properties
 
                 std::shared_ptr<std::vector<C>> cells; ///< shared with the region_model !
                 timeseries::timeaxis ta;///< shared with the region_model,  should be simulation time-axis
 
-                /** compute the local lateral inflow from connected shyft-cells into given node-id 
+                /** compute the local lateral inflow from connected shyft-cells into given node-id
                  *
                  */
                 rts_t local_inflow(int node_id) const {
@@ -186,7 +198,7 @@ namespace shyft {
                     for (const auto& i : node_map) {
                         if (i.second.downstream.id == node_id) {
                             auto flow_m3s = output_m3s(i.first);
-                            for (size_t t = 0;t < ta.size();++t) 
+                            for (size_t t = 0;t < ta.size();++t)
                                 r.add(t, flow_m3s.value(t));
                         }
                     }
@@ -203,7 +215,7 @@ namespace shyft {
                     std::vector<double> uhg_weights = node_map.at(node_id).uhg(dt);
                     auto sum_input_m3s = local_inflow(node_id)+ upstream_inflow(node_id);
                     auto response = timeseries::convolve_w_ts<decltype(sum_input_m3s)>(sum_input_m3s, uhg_weights, timeseries::convolve_policy::USE_ZERO);
-                    return std::move(rts_t(ta, timeseries::ts_values(response), timeseries::POINT_AVERAGE_VALUE)); // flatten values 
+                    return std::move(rts_t(ta, timeseries::ts_values(response), timeseries::POINT_AVERAGE_VALUE)); // flatten values
                 }
 
             };
@@ -228,7 +240,7 @@ void routing_test::test_hydrograph() {
     node_t c1;
     c1.geo.routing.id = 1; // target routing point 1
     c1.geo.routing.distance = 10000;
-    c1.geo.routing.velocity = c1.geo.routing.distance / (10 * 3600.0);// takes 10 hours to propagate the distance
+    c1.parameter.velocity = c1.geo.routing.distance / (10 * 3600.0);// takes 10 hours to propagate the distance
     calendar utc;
     ta_t ta(utc.time(2016,1,1),deltahours(1),24);
     c1.discharge_m3s= ts_t(ta,0.0,shyft::timeseries::POINT_AVERAGE_VALUE);
@@ -273,7 +285,7 @@ void routing_test::test_routing_model() {
     // node d is an endpoint node, observation point routing node where we
     // would like to observed the local_inflow + the upstream_inflow
     // --
-    // for now we just set routing parameters to 
+    // for now we just set routing parameters to
     // values suitable for demo and verification
     //--
     calendar utc;
@@ -288,25 +300,25 @@ void routing_test::test_routing_model() {
     cell_t cx;
     cx.geo.routing.id = a_id;
     cx.geo.routing.distance = 10000;
-    cx.geo.routing.velocity = cx.geo.routing.distance / (10 * 3600.0);// takes 10 hours to propagate the distance
+    cx.parameter.velocity = cx.geo.routing.distance / (10 * 3600.0);// takes 10 hours to propagate the distance
     cx.discharge_m3s= ts_t(ta, 0.0, shyft::timeseries::POINT_AVERAGE_VALUE);
     cx.discharge_m3s.set(0, 10.0);// set 10 m3/s at timestep 0.
     cells->push_back(cx); //ship it to cell-vector
-    cx.geo.routing.velocity = cx.geo.routing.distance / (7 * 3600.0);// takes 7 hours to propagate the distance
+    cx.parameter.velocity = cx.geo.routing.distance / (7 * 3600.0);// takes 7 hours to propagate the distance
     cx.discharge_m3s = ts_t(ta, 0.0, shyft::timeseries::POINT_AVERAGE_VALUE);
     cx.discharge_m3s.set(0, 7.0);
     cx.discharge_m3s.set(6, 6.0); // a second pulse after 6 hours
     cells->push_back(cx);
     cx.geo.routing.id = c_id;// route it to cell c
-    cx.geo.routing.velocity = cx.geo.routing.distance / (24 * 3600.0);// takes 14 hours to propagate the distance
+    cx.parameter.velocity = cx.geo.routing.distance / (24 * 3600.0);// takes 14 hours to propagate the distance
     cx.discharge_m3s = ts_t(ta, 0.0, shyft::timeseries::POINT_AVERAGE_VALUE);
     cx.discharge_m3s.set(0, 50.0);// just one large pulse, that will spread over 24 hours
     cells->push_back(cx);
 
-    // build the routing network as described, 
-    routing::node a{ a_id,routing_info(b_id, 2*3600.0, 1.0) };// two hour delay from
-    routing::node b{ b_id,routing_info(d_id, 0,1.0) }; // give zero delay
-    routing::node c{ c_id,routing_info(d_id, 3600.0, 1.0) };// give one hour delay
+    // build the routing network as described,
+    routing::node a{ a_id,routing_info(b_id, 2*3600.0),routing::node_parameter(1.0) };// two hour delay from
+    routing::node b{ b_id,routing_info(d_id, 0),routing::node_parameter(1.0) }; // give zero delay
+    routing::node c{ c_id,routing_info(d_id, 3600.0),routing::node_parameter(1.0) };// give one hour delay
     routing::node d{ d_id,routing_info(0) }; // here is our observation point node
 
     routing::model<cell_t> m;
@@ -328,7 +340,7 @@ void routing_test::test_routing_model() {
 
 #if 0
     // this is what we can easily do with dlib
-    // 
+    //
     dlib::directed_graph<routing::node>::kernel_1a_c md;
     md.set_number_of_nodes(4);
     md.add_edge(0,1);
