@@ -97,18 +97,7 @@ namespace shyft {
                 cell_parameter parameter;
                 geo_cell_data geo;
                 ts_t discharge_m3s;
-                /**create a unit hydro graph weight vector for the cell-node utilizing the
-                 *  cell geo.specific routing information, distance&speed.
-                 */
-                std::vector<double> uhg(utctimespan dt) const {
-                    double steps = (geo.routing.distance / parameter.velocity)/dt;// time = distance / velocity[s] // dt[s]
-                    int n_steps = int(steps + 0.5);
-                    return std::move(make_uhg_from_gamma(n_steps, parameter.alpha, parameter.beta));//std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
-                }
-                timeseries::convolve_w_ts<ts_t> output_m3s() const {
-                    // return discharge, notice that this function assumes that time_axis() do have a uniform delta() (requirement)
-                    return std::move(timeseries::convolve_w_ts<ts_t>(discharge_m3s,uhg(discharge_m3s.time_axis().delta()),timeseries::convolve_policy::USE_ZERO));
-                }
+
             };
 
             struct node_parameter {
@@ -174,6 +163,17 @@ namespace shyft {
                 std::shared_ptr<std::vector<C>> cells; ///< shared with the region_model !
                 timeseries::timeaxis ta;///< shared with the region_model,  should be simulation time-axis
 
+
+                std::vector<double> cell_uhg(const C& c, utctimespan dt) const {
+                    double steps = (c.geo.routing.distance / c.parameter.velocity)/dt;// time = distance / velocity[s] // dt[s]
+                    int n_steps = int(steps + 0.5);
+                    return std::move(make_uhg_from_gamma(n_steps, c.parameter.alpha, c.parameter.beta));//std::vector<double>{0.1,0.5,0.2,0.1,0.05,0.030,0.020};
+                }
+
+                timeseries::convolve_w_ts<rts_t> cell_output_m3s(const C&c ) const {
+                    // return discharge, notice that this function assumes that time_axis() do have a uniform delta() (requirement)
+                    return std::move(timeseries::convolve_w_ts<rts_t>(c.discharge_m3s,cell_uhg(c,ta.delta()),timeseries::convolve_policy::USE_ZERO));
+                }
                 /** compute the local lateral inflow from connected shyft-cells into given node-id
                  *
                  */
@@ -181,7 +181,7 @@ namespace shyft {
                     rts_t r(ta,0.0,timeseries::POINT_AVERAGE_VALUE);// default null to null ts.
                     for (const auto& c : *cells) {
                         if (c.geo.routing.id == node_id) {
-                            auto node_output_m3s = c.output_m3s();
+                            auto node_output_m3s = cell_output_m3s(c);
                             for (size_t t = 0;t < r.size();++t)
                                 r.add(t, node_output_m3s.value(t));
                         }
@@ -230,46 +230,14 @@ void routing_test::test_hydrograph() {
     //
     //  Just for playing around with sum of routing node response
     //
-    using ta_t =shyft::time_axis::fixed_dt;
-    using ts_t = shyft::timeseries::point_ts<ta_t>;
-
-    //using ats_t = shyft::api::apoint_ts;
-    using namespace shyft::core;
-    //using namespace shyft::timeseries;
-    using node_t = routing::cell_node<ts_t>;
-    node_t c1;
-    c1.geo.routing.id = 1; // target routing point 1
-    c1.geo.routing.distance = 10000;
-    c1.parameter.velocity = c1.geo.routing.distance / (10 * 3600.0);// takes 10 hours to propagate the distance
-    calendar utc;
-    ta_t ta(utc.time(2016,1,1),deltahours(1),24);
-    c1.discharge_m3s= ts_t(ta,0.0,shyft::timeseries::POINT_AVERAGE_VALUE);
-    c1.discharge_m3s.set(0,10.0);
-
-    auto c2 =c1;c2.geo.routing.distance = 5 * 1000;
-    c2.discharge_m3s.set(0,20.0);
-    auto c3 = c1; c3.geo.routing.distance = 1 * 1000;
-    c3.discharge_m3s.set(0, 5.0);
-    c3.discharge_m3s.set(1, 35.0);
-    std::vector<node_t::output_m3s_t> responses;
-    responses.push_back(c1.output_m3s());
-    responses.push_back(c2.output_m3s());
-    responses.push_back(c3.output_m3s());
-    shyft::timeseries::uniform_sum_ts<node_t::output_m3s_t> sum_output_m3s(responses);
-    std::cout << "\nresult:\n";
-    for(size_t i=0;i<ta.size();++i) {
-        std::cout<<i<<"\t"<<std::setprecision(2)<<c1.output_m3s().value(i)<<"\t"<<c2.output_m3s().value(i)<<"\t"<<c3.output_m3s().value(i)<<"\t"<<sum_output_m3s.value(i)<<"\n";
-        double exepected_value = c1.output_m3s().value(i) + c2.output_m3s().value(i) + c3.output_m3s().value(i);
-        TS_ASSERT_DELTA(exepected_value, sum_output_m3s.value(i), 0.00001);
-    }
 
 }
 
 //-- consider using dlib graph to do the graph stuff
 
-#include <dlib/graph_utils.h>
-#include <dlib/graph.h>
-#include <dlib/directed_graph.h>
+//#include <dlib/graph_utils.h>
+//#include <dlib/graph.h>
+//#include <dlib/directed_graph.h>
 
 void routing_test::test_routing_model() {
     using namespace shyft::core;
