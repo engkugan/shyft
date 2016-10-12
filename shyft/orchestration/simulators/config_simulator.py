@@ -193,7 +193,7 @@ class ConfigCalibrator(simulator.DefaultSimulator):
         """Save calibrated params in a model-like YAML file."""
         name_map = {"pt": "priestley_taylor", "kirchner": "kirchner",
                     "p_corr": "precipitation_correction", "ae": "actual_evapotranspiration",
-                    "gs": "gamma_snow", "ss": "skaugen_snow", "hs": "hbv_snow"}
+                    "gs": "gamma_snow", "ss": "skaugen_snow", "hs": "hbv_snow", "hbv_actual_evapotranspiration": "ae", "hbv_soil": "soil", "hbv_tank": "tank"}
         mapped_results = {optim_param.get_name(i): optim_param.get(i) for i in range(optim_param.size())}
 
         # Existing model parameters structure

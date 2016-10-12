@@ -159,7 +159,6 @@
     <ClCompile Include="gridpp_test.cpp" />
     <ClCompile Include="hbv_actual_evapotranspiration_test.cpp" />
     <ClCompile Include="hbv_soil_test.cpp" />
-    <ClCompile Include="hbv_stack_test.cpp" />
     <ClCompile Include="hbv_tank_test.cpp" />
     <ClCompile Include="kalman_test.cpp" />
     <ClCompile Include="pt_ss_k_test.cpp" />

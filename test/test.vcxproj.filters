@@ -171,9 +171,6 @@
     <ClCompile Include="hbv_actual_evapotranspiration_test.cpp">
       <Filter>methods</Filter>
     </ClCompile>
-    <ClCompile Include="hbv_stack_test.cpp">
-      <Filter>method-stacks</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="methods">

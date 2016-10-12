@@ -13,8 +13,8 @@ namespace shyft {
 
 			bool from_raw_string(const char* str, hbv_stack_state_t& s) const {
 				if (str && *str) {
-					if (sscanf(str, "hbv_stack:%lf %lf %lf %lf %lf",
-						&s.snow.sca, &s.snow.swe,
+					if (sscanf(str, "hbv_stack:%lf %lf %lf %lf %lf",	// 5 states, 5 times %lf what %lf?
+						&s.snow.sca, &s.snow.swe,						// why with &s
 						&s.soil.sm,
 						&s.tank.uz, &s.tank.lz) == 5)		//Why ==5
 						return true;
@@ -24,8 +24,8 @@ namespace shyft {
 
 			std::string to_string(const hbv_stack_state_t& s) const {
 				char r[500];
-				sprintf(r, "hbv_stack:%f %f %f %f %f \n",
-					s.snow.sca, s.snow.swe,
+				sprintf(r, "hbv_stack:%f %f %f %f %f \n",				// 5 states, 5 times %lf what %lf?
+					s.snow.sca, s.snow.swe,								// why not &s only s
 					s.soil.sm,
 					s.tank.uz, s.tank.lz);
 				return r;

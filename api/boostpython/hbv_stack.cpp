@@ -2,7 +2,7 @@
 #include <boost/python/docstring_options.hpp>
 #include "core/utctime_utilities.h"
 #include "core/priestley_taylor.h"
-#include "core/actual_evapotranspiration.h"
+#include "core/hbv_actual_evapotranspiration.h"
 #include "core/precipitation_correction.h"
 #include "core/hbv_snow.h"
 #include "core/hbv_soil.h"
@@ -34,7 +34,7 @@ namespace expose {
 				.def(init<const priestley_taylor::parameter&, const hbv_snow::parameter&, const hbv_actual_evapotranspiration::parameter&, const hbv_soil::parameter&, const hbv_tank::parameter&, const precipitation_correction::parameter&>(args("pt", "snow", "ae", "soil", "tank", "p_corr"), "create object with specified parameters"))
 				.def(init<const parameter&>(args("p"), "clone a parameter"))
 				.def_readwrite("pt", &parameter::pt, "priestley_taylor parameter")
-				.def_readwrite("ae", &parameter::ae, "actual evapotranspiration parameter")
+				.def_readwrite("ae", &parameter::ae, "hbv actual evapotranspiration parameter")
 				.def_readwrite("snow", &parameter::snow, "hbv_snow parameter")
 				.def_readwrite("soil", &parameter::soil, "hbv_soil parameter")
 				.def_readwrite("tank", &parameter::soil, "hbv_tank parameter")
@@ -79,9 +79,9 @@ namespace expose {
 				//.def_readonly("snow_sca",&HbvAllCollector::snow_sca," hbv snow covered area fraction, sca.. 0..1 - at the end of timestep (state)")
 				//.def_readonly("snow_swe",&HbvAllCollector::snow_swe,"hbv snow swe, [mm] over the cell sca.. area, - at the end of timestep")
 				.def_readonly("snow_outflow", &HbvAllCollector::snow_outflow, " hbv snow output [m3/s] for the timestep")
-				.def_readonly("ae_output", &HbvAllCollector::ae_output, "actual evap mm/h")
+				.def_readonly("ae_output", &HbvAllCollector::ae_output, "hbv actual evap mm/h")
 				.def_readonly("soil_outflow", &HbvAllCollector::soil_outflow, " hbv soil output [m3/s] for the timestep") // Check??
-				.def_readonly("avg_discharge", &HbvAllCollector::avg_discharge, "Tank outflow given in[m3/s] for the timestep")
+				.def_readonly("avg_discharge", &HbvAllCollector::avg_discharge, "Total discharge given in[m3/s] for the timestep")
 				.def_readonly("end_reponse", &HbvAllCollector::end_reponse, "end_response, at the end of collected")
 				;
 
@@ -90,7 +90,7 @@ namespace expose {
 				.def_readonly("destination_area", &HbvDischargeCollector::destination_area, "a copy of cell area [m2]")
 				.def_readonly("snow_sca", &HbvDischargeCollector::snow_sca, " hbv snow covered area fraction, sca.. 0..1 - at the end of timestep (state)")
 				.def_readonly("snow_swe", &HbvDischargeCollector::snow_swe, "hbv snow swe, [mm] over the cell sca.. area, - at the end of timestep")
-				.def_readonly("avg_discharge", &HbvDischargeCollector::avg_discharge, "Tank Outflow given in [m3/s] for the timestep")
+				.def_readonly("avg_discharge", &HbvDischargeCollector::avg_discharge, "Total Outflow given in [m3/s] for the timestep")
 				.def_readonly("end_reponse", &HbvDischargeCollector::end_response, "end_response, at the end of collected")
 				.def_readwrite("collect_snow", &HbvDischargeCollector::collect_snow, "controls collection of snow routine");
 
@@ -125,8 +125,8 @@ namespace expose {
 			models() {
 			typedef shyft::core::region_model<hbv_stack::cell_discharge_response_t> HbvOptModel;
 			typedef shyft::core::region_model<hbv_stack::cell_complete_response_t> HbvModel;
-			expose::model<HbvModel>("HbvModel", "Hbv_stack");
-			expose::model<HbvOptModel>("HbvOptModel", "Hbv_stack");
+			expose::model<HbvModel>("HbvModel", "Hbv");
+			expose::model<HbvOptModel>("HbvOptModel", "Hbv");
 		}
 
 		static void

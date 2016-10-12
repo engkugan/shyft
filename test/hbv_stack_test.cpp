@@ -1,7 +1,7 @@
 #include "test_pch.h"
 #include "hbv_stack_test.h"
 #include "core/hbv_stack.h"
-#include "mocks_hbv.h"
+#include "mocks.h"
 #include "core/timeseries.h"
 #include "core/utctime_utilities.h"
 
@@ -32,7 +32,7 @@ namespace shyfttest {
 		template <> template <>
 		void DischargeCollector<timeaxis>::collect<response>(size_t idx, const response& response) {
 			// hbv_outflow is given in mm, so compute the totals
-			tank_discharge.set(idx, destination_area*response.tank.outflow / 1000.0 / 3600.0);
+			avg_discharge.set(idx, destination_area*response.tank.outflow / 1000.0 / 3600.0);
 		}
 	};
 }; // End namespace shyfttest

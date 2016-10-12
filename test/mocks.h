@@ -37,27 +37,27 @@ namespace shyfttest {
 			template<class T>
 			struct DischargeCollector {
 				double destination_area;
-				shyft::timeseries::point_ts<T> tank_discharge; // Discharge in m^3
+				shyft::timeseries::point_ts<T> avg_discharge; // Discharge in m^3
 
 				DischargeCollector() : destination_area(0.0) {}
 				DischargeCollector(const double destination_area) : destination_area(destination_area) {}
 				DischargeCollector(const double destination_area, const T& time_axis)
-					: destination_area(destination_area), tank_discharge(time_axis, 0.0) {}
+					: destination_area(destination_area), avg_discharge(time_axis, 0.0) {}
 
 				void initialize(const T& time_axis) {
-					tank_discharge = shyft::timeseries::point_ts<T>(time_axis, 0.0);
+					avg_discharge = shyft::timeseries::point_ts<T>(time_axis, 0.0);
 				}
 
 				template<class R>
 				void collect(size_t idx, const R& resp) {
-					tank_discharge.set(idx, destination_area * resp.tank.outflow / 1000.0 / 3600.0); // q_avg in mm
+					avg_discharge.set(idx, destination_area * resp.tank.outflow / 1000.0 / 3600.0); // q_avg in mm
 				}
 
 				template<class R>
 				void set_end_response(const R& response) {}
 
 				const shyft::timeseries::point_ts<T>& discharge() const {
-					return tank_discharge;
+					return avg_discharge;
 				}
 			};
 
@@ -71,7 +71,7 @@ namespace shyfttest {
 				}
 
 				// Collected from the response, to better understand the model
-				shyft::timeseries::point_ts<T> tank_discharge; // HBN_Tank Discharge given in m^3/s
+				shyft::timeseries::point_ts<T> avg_discharge; // HBN_Total Discharge given in m^3/s
 				shyft::timeseries::point_ts<T> _snow_sca; // hbv snow, sca..
 				shyft::timeseries::point_ts<T> _snow_swe; // hbv snow swe, mm
 				shyft::timeseries::point_ts<T> _snow_output; // snow output in m^3/s
@@ -84,7 +84,7 @@ namespace shyfttest {
 				ResponseCollector(double destination_area) : destination_area(destination_area) {}
 
 				ResponseCollector(double destination_area, const T& time_axis) : destination_area(destination_area),
-					tank_discharge(time_axis, 0.0),
+					avg_discharge(time_axis, 0.0),
 					_snow_sca(time_axis, 0.0),
 					_snow_swe(time_axis, 0.0),
 					_snow_output(time_axis, 0.0),
@@ -92,7 +92,7 @@ namespace shyfttest {
 					_pe_output(time_axis, 0.0) {}
 
 				void initialize(const T& time_axis) {
-					tank_discharge = shyft::timeseries::point_ts<T>(time_axis, 0.0);
+					avg_discharge = shyft::timeseries::point_ts<T>(time_axis, 0.0);
 					_snow_sca = shyft::timeseries::point_ts<T>(time_axis, 0.0);
 					_snow_swe = shyft::timeseries::point_ts<T>(time_axis, 0.0);
 					_snow_output = shyft::timeseries::point_ts<T>(time_axis, 0.0);
@@ -103,7 +103,7 @@ namespace shyfttest {
 
 				template<class R>
 				void collect(size_t idx, const R& response) {
-					tank_discharge.set(idx, mmh_to_m3s(response.total_discharge)); // want m3/s, q_avg is in mm/h, so compute the totals in mm/s
+					avg_discharge.set(idx, mmh_to_m3s(response.total_discharge)); // want m3/s, q_avg is in mm/h, so compute the totals in mm/s
 					_snow_sca.set(idx, response.gs.sca);
 					_snow_output.set(idx, response.gs.outflow); // current mm/h, but want m3/s, but we get mm/h from snow output
 					_snow_swe.set(idx, response.gs.storage);
@@ -114,7 +114,7 @@ namespace shyfttest {
 				template<class R>
 				void set_end_response(const R& r) {}
 
-				const shyft::timeseries::point_ts<T>& discharge() const { return tank_discharge; }
+				const shyft::timeseries::point_ts<T>& discharge() const { return avg_discharge; }
 				const shyft::timeseries::point_ts<T>& snow_sca() const { return _snow_sca; }
 				const shyft::timeseries::point_ts<T>& snow_swe() const { return _snow_swe; }
 				const shyft::timeseries::point_ts<T>& snow_output() const { return _snow_output; }
@@ -122,6 +122,7 @@ namespace shyfttest {
 				const shyft::timeseries::point_ts<T>& pe_output() const { return _pe_output; }
 			};
 		};
+
 		struct PTGSKResponseCollector {
 			std::vector<shyft::timeseries::point> evap;
 			std::vector<shyft::timeseries::point> snow_storage;
