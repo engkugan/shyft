@@ -40,6 +40,7 @@ shyft/tests/state_tmp
 workspace.xml
 ValgrindOut.xml
 cachegrind.out.*
+*.vcxproj*
 
 /SHyFT.VC.db
 *.opendb
